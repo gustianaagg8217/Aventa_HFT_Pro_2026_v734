@@ -1,0 +1,112 @@
+Aktifkan environment
+PowerShell
+venv\Scripts\Activate.ps1
+
+Command Prompt (CMD)
+venv\Scripts\activate
+
+
+Kalau sukses, prompt berubah jadi:
+
+(venv) D:\AVENTA\Aventa_AI\Aventa_HFT_Pro_2026_v72>
+
+
+Ini tanda environment sudah aktif.
+Kalau belum ada (venv), jangan lanjut.
+
+4. Install dependency di environment ini
+
+Minimal yang hampir pasti kamu butuhkan:
+
+pip install --upgrade pip
+pip install MetaTrader5 numpy pandas scikit-learn torch
+
+
+Kalau nanti error module lain, tinggal install tambahannya.
+Keuntungannya: tidak merusak Python global.
+
+5. Jalankan Aventa di environment
+
+Ini inti pertanyaan kamu.
+
+python Aventa_HFT_Pro_2026_v7_2.py
+
+
+Atau kalau pakai config tertentu (contoh):
+
+python Aventa_HFT_Pro_2026_v7_2.py --config config_GOLD.json
+
+
+Selama (venv) aktif, SEMUA:
+
+import
+
+library
+
+model
+
+MT5 connector
+
+pakai environment ini.
+
+6. Cara cek: ini benar-benar jalan di environment
+
+Jalankan:
+
+where python
+
+
+Harus mengarah ke:
+
+...\Aventa_HFT_Pro_2026_v72\venv\Scripts\python.exe
+
+
+Kalau masih ke C:\Python310\python.exe, berarti environment belum aktif.
+
+7. (Opsional tapi recommended) Pakai batch file
+
+Supaya user tinggal double-click.
+
+Edit Aventa_HFT_Pro_2026_v7_2.bat jadi seperti ini:
+
+@echo off
+cd /d %~dp0
+call venv\Scripts\activate
+python Aventa_HFT_Pro_2026_v7_2.py
+pause
+
+
+Ini:
+
+otomatis aktifkan environment
+
+aman buat user non-teknis
+
+cocok untuk distribusi Aventa
+
+8. Ringkasannya (cheat sheet)
+cd D:\AVENTA\Aventa_AI\Aventa_HFT_Pro_2026_v72
+python -m venv venv
+venv\Scripts\activate
+pip install MetaTrader5 numpy pandas torch
+python Aventa_HFT_Pro_2026_v7_2.py
+
+9. Catatan jujur (penting)
+
+Dengan setup ini:
+
+Aventa isolated
+
+Lebih stabil saat dibungkus EXE (Nuitka / PyInstaller)
+
+Lebih aman buat user
+
+Lebih profesional
+
+Kalau kamu mau next step:
+
+pisahin environment training vs live
+
+atau bikin environment khusus AI training (envs folder)
+
+atau integrasi ini ke installer EXE

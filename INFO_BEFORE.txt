@@ -1,0 +1,20 @@
+INFORMASI SEBELUM INSTALASI
+
+Pastikan Anda telah menutup semua aplikasi terkait sebelum melanjutkan instalasi.
+
+- Aplikasi ini dilindungi lisensi dan hanya boleh digunakan oleh pihak yang memiliki izin resmi dari PT. Aventa AI.
+- Perdagangan aset finansial mengandung risiko. PT. Aventa AI tidak menjamin keuntungan dan tidak bertanggung jawab atas kerugian trading.
+- Instalasi membutuhkan hak administrator untuk keperluan konfigurasi sistem dan keamanan aplikasi.
+- Data lama tidak akan terhapus, namun sangat disarankan untuk melakukan backup sebelum instalasi.
+- Aplikasi ini menggunakan mekanisme aktivasi dan validasi lisensi. Pastikan koneksi internet aktif saat pertama kali dijalankan.
+
+Kebutuhan Sistem Minimum:
+- Windows 10 / 11 (64-bit)
+- RAM minimal 8 GB (disarankan 16 GB)
+- Koneksi internet
+- MetaTrader 5 (jika digunakan untuk trading)
+
+Jika Anda mengalami kendala, silakan hubungi:
+connect.aventa.ai@gmail.com
+
+Tekan Next untuk melanjutkan instalasi.
