@@ -1,0 +1,95 @@
+Aventa HFT Pro 2026
+Copyright © 2025
+PT. Aventa AI
+Seluruh hak cipta dilindungi undang-undang.
+
+1. Ketentuan Umum
+
+Perjanjian lisensi ini merupakan perjanjian hukum antara pengguna (“Pengguna”) dan PT. Aventa AI terkait penggunaan perangkat lunak Aventa HFT Pro 2026 (“Perangkat Lunak”).
+
+Dengan menginstal, menjalankan, atau menggunakan Perangkat Lunak ini, Pengguna dianggap telah membaca, memahami, dan menyetujui seluruh ketentuan dalam perjanjian ini.
+
+2. Pemberian Lisensi
+
+PT. Aventa AI memberikan lisensi terbatas, non-eksklusif, non-transferable, dan tanpa hak sub-lisensi kepada Pengguna untuk menggunakan Perangkat Lunak ini hanya untuk keperluan internal sesuai ketentuan yang berlaku.
+
+3. Pembatasan Penggunaan
+
+Pengguna dilarang keras untuk:
+
+Mendistribusikan, menjual kembali, menyewakan, atau memindahtangankan Perangkat Lunak
+
+Melakukan reverse engineering, dekompilasi, disassembly, atau upaya lain untuk memperoleh kode sumber
+
+Memodifikasi, menyalin, atau membuat turunan Perangkat Lunak tanpa izin tertulis
+
+Menggunakan Perangkat Lunak untuk tujuan ilegal atau melanggar hukum yang berlaku
+
+4. Risiko Trading & Penafian Tanggung Jawab
+
+Pengguna memahami bahwa perdagangan aset keuangan memiliki risiko tinggi dan dapat mengakibatkan kerugian.
+
+PT. Aventa AI tidak memberikan jaminan keuntungan, dan seluruh keputusan trading serta risiko sepenuhnya menjadi tanggung jawab Pengguna.
+
+5. Pembatasan Tanggung Jawab
+
+Dalam keadaan apa pun, PT. Aventa AI tidak bertanggung jawab atas:
+
+Kerugian finansial
+
+Kehilangan data
+
+Gangguan sistem
+
+Kerusakan perangkat keras atau lunak
+
+Kerugian tidak langsung atau konsekuensial lainnya
+
+Tanggung jawab PT. Aventa AI, apabila ada, dibatasi maksimal sebesar biaya lisensi yang dibayarkan Pengguna.
+
+6. Aktivasi, Lisensi & Validasi
+
+Perangkat Lunak dapat menggunakan mekanisme aktivasi, validasi lisensi, atau identifikasi perangkat (hardware/software ID) untuk memastikan kepatuhan lisensi.
+
+PT. Aventa AI berhak menonaktifkan lisensi apabila ditemukan pelanggaran ketentuan.
+
+7. Pembaruan & Perubahan
+
+PT. Aventa AI berhak melakukan:
+
+Pembaruan versi
+
+Perubahan fitur
+
+Perbaikan bug
+
+Penghentian layanan tertentu
+
+tanpa kewajiban pemberitahuan sebelumnya.
+
+8. Penghentian Lisensi
+
+Lisensi ini berakhir secara otomatis apabila Pengguna melanggar ketentuan perjanjian ini.
+Tidak ada kewajiban pengembalian dana atas penghentian lisensi akibat pelanggaran.
+
+9. Data Teknis (Opsional)
+
+Perangkat Lunak dapat mengirimkan data teknis non-pribadi untuk tujuan:
+
+Validasi lisensi
+
+Keamanan
+
+Peningkatan kualitas produk
+
+10. Hukum yang Berlaku
+
+Perjanjian ini tunduk dan ditafsirkan berdasarkan hukum Republik Indonesia.
+
+11. Kontak Resmi
+
+Untuk pertanyaan, dukungan, atau permohonan izin khusus:
+📧 connect.aventa.ai@gmail.com
+
+PT. Aventa AI
+Indonesia

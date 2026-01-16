@@ -1,0 +1,17 @@
+Aventa HFT Pro 2026 License Agreement
+
+Copyright (c) 2025 PT. Aventa AI
+
+DILARANG mendistribusikan, menggandakan, atau memodifikasi aplikasi ini tanpa izin tertulis dari PT. Aventa AI.
+
+Dengan melanjutkan instalasi, Anda setuju dengan syarat dan ketentuan berikut:
+
+1. Lisensi ini hanya diberikan untuk penggunaan internal oleh pihak yang menerima aplikasi ini secara resmi dari PT. Aventa AI.
+2. Dilarang keras melakukan reverse engineering, dekompilasi, atau upaya lain untuk memperoleh kode sumber aplikasi ini.
+3. PT. Aventa AI tidak bertanggung jawab atas kerusakan, kehilangan data, atau kerugian lain yang timbul akibat penggunaan aplikasi ini.
+4. Segala bentuk pelanggaran terhadap ketentuan lisensi ini dapat berakibat pada tuntutan hukum sesuai peraturan yang berlaku di Indonesia.
+5. Untuk pertanyaan atau permohonan izin khusus, silakan hubungi: support@aventa-ai.com
+
+Terima kasih telah menggunakan produk kami.
+
+PT. Aventa AI
