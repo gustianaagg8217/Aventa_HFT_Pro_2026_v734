@@ -3603,12 +3603,13 @@ class HFTProGUI:
                     # Check if training stats exist
                     if hasattr(ml, 'training_stats') and ml.training_stats:
                         stats = ml.training_stats
+                        model_type = stats.get('model_type', 'Unknown')
                         metrics_text = f"""
-        📈 Direction Model (RandomForest):
+        📈 Direction Model ({model_type}):
         • Training Accuracy: {stats.get('direction_train_acc', 0)*100:.2f}%
         • Testing Accuracy:   {stats.get('direction_test_acc', 0)*100:.2f}%
 
-        📈 Confidence Model (GradientBoosting):
+        📈 Confidence Model ({model_type}):
         • Training Accuracy: {stats.get('confidence_train_acc', 0)*100:.2f}%
         • Testing Accuracy:  {stats.get('confidence_test_acc', 0)*100:.2f}%
 
@@ -3684,12 +3685,13 @@ class HFTProGUI:
                     metrics_text = ""
                     if hasattr(ml, 'training_stats') and ml.training_stats:
                         stats = ml.training_stats
+                        model_type = stats.get('model_type', 'ML')
                         metrics_text = f"""
-        📈 Direction Model: 
+        📈 Direction Model ({model_type}): 
         • Training:   {stats.get('direction_train_acc', 0)*100:.2f}%
         • Testing:   {stats.get('direction_test_acc', 0)*100:.2f}%
 
-        📈 Confidence Model: 
+        📈 Confidence Model ({model_type}): 
         • Training:  {stats.get('confidence_train_acc', 0)*100:.2f}%
         • Testing:   {stats.get('confidence_test_acc', 0)*100:.2f}%
 
