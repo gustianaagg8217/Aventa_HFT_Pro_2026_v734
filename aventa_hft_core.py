@@ -89,7 +89,7 @@ class Signal:
 class UltraLowLatencyEngine:
     """Core HFT engine with microsecond precision"""
     
-    def __init__(self, symbol: str, config:  Dict, risk_manager=None):
+    def __init__(self, symbol: str, config:  Dict, risk_manager=None, ml_predictor=None):
         # ========================================
         # STEP 1: Initialize critical dependencies FIRST
         # ========================================
@@ -102,6 +102,7 @@ class UltraLowLatencyEngine:
         self.symbol = symbol
         self.config = config
         self.risk_manager = risk_manager
+        self.ml_predictor = ml_predictor
         
         # ========================================
         # STEP 3: Data structures
@@ -607,6 +608,34 @@ class UltraLowLatencyEngine:
         if microstructure['volatility'] > self.config.get('max_volatility', 0.001):
             signal_strength *= 0.5
             reason.append("High volatility - reduced confidence")
+        
+        # ML Prediction Enhancement
+        if self.ml_predictor and self.ml_predictor.is_trained:
+            try:
+                # Prepare features for ML prediction
+                features = self.ml_predictor.prepare_realtime_features(current_tick, microstructure)
+                ml_direction_num, ml_confidence = self.ml_predictor.predict(features)
+                
+                # Convert ML direction: 1 = BUY, 0/-1 = SELL
+                ml_direction = 'BUY' if ml_direction_num == 1 else 'SELL'
+                
+                # Enhance signal strength based on ML prediction
+                if signal_type and ml_direction == signal_type:
+                    # ML agrees with technical signal - boost confidence
+                    signal_strength = min(1.0, signal_strength + (ml_confidence * 0.3))
+                    reason.append(f"ML Enhanced: {ml_direction} confidence {ml_confidence:.2f}")
+                elif signal_type and ml_direction != signal_type:
+                    # ML disagrees - reduce confidence
+                    signal_strength *= (1.0 - ml_confidence * 0.2)
+                    reason.append(f"ML Conflict: Technical {signal_type} vs ML {ml_direction} ({ml_confidence:.2f})")
+                elif not signal_type and ml_confidence > 0.6:
+                    # No technical signal but strong ML signal
+                    signal_type = ml_direction
+                    signal_strength = ml_confidence * 0.7  # Scale down ML-only signals
+                    reason.append(f"ML Signal: {ml_direction} confidence {ml_confidence:.2f}")
+                    
+            except Exception as e:
+                logger.warning(f"ML prediction error: {e}")
         
         # Check if we should close position
         if self.position_type is not None:
