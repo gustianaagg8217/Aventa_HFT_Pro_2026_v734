@@ -365,7 +365,14 @@ Use the buttons below for quick actions 👇
         symbol = config.get('symbol', 'EURUSD')
         
         self.risk_manager = RiskManager(config.get('limits', {}))
-        self.engine = UltraLowLatencyEngine(symbol, config)
+        
+        # Create ML predictor if enabled
+        ml_predictor = None
+        if config.get('use_ml', False):
+            from ml_predictor import MLPredictor
+            ml_predictor = MLPredictor(symbol, config)
+        
+        self.engine = UltraLowLatencyEngine(symbol, config, self.risk_manager, ml_predictor)
         
         if self.engine.start():
             self.is_trading = True

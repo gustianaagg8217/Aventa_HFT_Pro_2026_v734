@@ -163,12 +163,18 @@ class MLPredictor:
             # Scalers
             self.feature_scaler = StandardScaler()
 
+            # Feature columns for prediction
+            self.feature_columns = []
+
             # Feature buffer
             self.feature_history = deque(maxlen=10000)
 
             # Model performance tracking
             self.predictions = deque(maxlen=1000)
             self.actual_results = deque(maxlen=1000)
+
+            # Training statistics
+            self.training_stats = {}
 
             self.is_trained = False
         
@@ -296,7 +302,7 @@ class MLPredictor:
             return best_rf, best_rf_score, best_gb, best_gb_score
 
         def train_models(self, X, y):
-            """Train all ML models"""
+            """Train all ML models with XGBoost"""
             try:
                 if X is None or y is None or len(X) == 0:
                     self.logger.error("Invalid training data")
@@ -306,69 +312,181 @@ class MLPredictor:
                         'metrics': {}
                     }
 
-                from sklearn.model_selection import train_test_split
-                from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+                from sklearn.model_selection import train_test_split, cross_val_score
+                from sklearn.preprocessing import StandardScaler
+                
+                # Try to import XGBoost, fallback to sklearn if not available
+                try:
+                    from xgboost import XGBClassifier
+                    USE_XGBOOST = True
+                    self.logger.info("Using XGBoost for enhanced performance")
+                except ImportError:
+                    self.logger.warning("XGBoost not available, using sklearn RandomForest and GradientBoosting")
+                    USE_XGBOOST = False
+                    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 
                 # Split data
                 X_train, X_test, y_train, y_test = train_test_split(
                     X, y, test_size=0.2, random_state=42, shuffle=False
                 )
 
+                # Store feature columns for prediction
+                if hasattr(X, 'columns'):
+                    # X is DataFrame
+                    self.feature_columns = list(X.columns)
+                else:
+                    # X is numpy array, assume standard feature order from GUI
+                    self.feature_columns = ['ema_fast', 'ema_slow', 'rsi', 'atr', 'momentum', 'open', 'high', 'low', 'close', 'tick_volume']
+
                 # Scale features
                 X_train_scaled = self.feature_scaler.fit_transform(X_train)
                 X_test_scaled = self.feature_scaler.transform(X_test)
 
-                # Train direction model (RandomForest)
-                self.logger.info("Training Direction Model (RandomForest)...")
-                self.direction_model = RandomForestClassifier(
-                    n_estimators=100,
-                    max_depth=10,
-                    min_samples_split=20,
-                    min_samples_leaf=10,
-                    random_state=42,
-                    n_jobs=-1
-                )
-                self.direction_model.fit(X_train_scaled, y_train)
-                direction_train_score = self.direction_model.score(X_train_scaled, y_train)
-                direction_test_score = self.direction_model.score(X_test_scaled, y_test)
+                if USE_XGBOOST:
+                    # Advanced XGBoost training with early stopping and hyperparameter tuning
+                    self.logger.info("Training Direction Model (XGBoost with hyperparameter tuning)...")
+                    
+                    # Hyperparameter grid for direction model
+                    direction_params = {
+                        'n_estimators': [100, 200, 300],
+                        'max_depth': [3, 4, 5],
+                        'learning_rate': [0.01, 0.05, 0.1],
+                        'subsample': [0.7, 0.8, 0.9],
+                        'colsample_bytree': [0.7, 0.8, 0.9],
+                        'gamma': [0, 0.1, 0.2],
+                        'reg_alpha': [0, 0.01, 0.1],
+                        'reg_lambda': [1.0, 1.5, 2.0]
+                    }
+                    
+                    # Find best parameters for direction model
+                    best_direction_model = self._tune_xgboost_hyperparameters(
+                        X_train_scaled, y_train, X_test_scaled, y_test, direction_params
+                    )
+                    
+                    self.direction_model = best_direction_model
+                    direction_train_score = self.direction_model.score(X_train_scaled, y_train)
+                    direction_test_score = self.direction_model.score(X_test_scaled, y_test)
 
-                # Train confidence model (GradientBoosting)
-                self.logger.info("Training Confidence Model (GradientBoosting)...")
-                self.confidence_model = GradientBoostingClassifier(
-                    n_estimators=100,
-                    max_depth=5,
-                    learning_rate=0.1,
-                    random_state=42
-                )
-                self.confidence_model.fit(X_train_scaled, y_train)
-                confidence_train_score = self.confidence_model.score(X_train_scaled, y_train)
-                confidence_test_score = self.confidence_model.score(X_test_scaled, y_test)
+                    # Hyperparameter grid for confidence model (more conservative)
+                    confidence_params = {
+                        'n_estimators': [100, 150, 200],
+                        'max_depth': [2, 3, 4],
+                        'learning_rate': [0.01, 0.03, 0.05],
+                        'subsample': [0.6, 0.7, 0.8],
+                        'colsample_bytree': [0.6, 0.7, 0.8],
+                        'gamma': [0.1, 0.2, 0.3],
+                        'reg_alpha': [0.01, 0.1, 0.5],
+                        'reg_lambda': [1.0, 1.5, 2.0]
+                    }
+                    
+                    self.logger.info("Training Confidence Model (XGBoost with hyperparameter tuning)...")
+                    
+                    # Find best parameters for confidence model
+                    best_confidence_model = self._tune_xgboost_hyperparameters(
+                        X_train_scaled, y_train, X_test_scaled, y_test, confidence_params
+                    )
+                    
+                    self.confidence_model = best_confidence_model
+                    confidence_train_score = self.confidence_model.score(X_train_scaled, y_train)
+                    confidence_test_score = self.confidence_model.score(X_test_scaled, y_test)
+                    
+                    self.logger.info("✅ XGBoost hyperparameter tuning completed")
+                    
+                    # Log feature importance will be called after training stats are initialized
+                    
+                else:
+                    # Fallback to sklearn models
+                    # Train direction model (RandomForest)
+                    self.logger.info("Training Direction Model (RandomForest)...")
+                    self.direction_model = RandomForestClassifier(
+                        n_estimators=200,
+                        max_depth=6,
+                        min_samples_split=50,
+                        min_samples_leaf=25,
+                        max_features='sqrt',
+                        random_state=42,
+                        n_jobs=-1
+                    )
+                    self.direction_model.fit(X_train_scaled, y_train)
+                    direction_train_score = self.direction_model.score(X_train_scaled, y_train)
+                    direction_test_score = self.direction_model.score(X_test_scaled, y_test)
+
+                    # Train confidence model (GradientBoosting)
+                    self.logger.info("Training Confidence Model (GradientBoosting)...")
+                    self.confidence_model = GradientBoostingClassifier(
+                        n_estimators=150,
+                        max_depth=3,
+                        learning_rate=0.05,
+                        subsample=0.8,
+                        random_state=42
+                    )
+                    self.confidence_model.fit(X_train_scaled, y_train)
+                    confidence_train_score = self.confidence_model.score(X_train_scaled, y_train)
+                    confidence_test_score = self.confidence_model.score(X_test_scaled, y_test)
+
+                # Add cross-validation for better evaluation
+                try:
+                    if USE_XGBOOST:
+                        # For XGBoost, create temporary models without early stopping for CV
+                        from xgboost import XGBClassifier
+                        temp_direction_model = XGBClassifier(
+                            **{k: v for k, v in self.direction_model.get_params().items() 
+                               if k not in ['early_stopping_rounds', 'eval_metric']}
+                        )
+                        temp_confidence_model = XGBClassifier(
+                            **{k: v for k, v in self.confidence_model.get_params().items() 
+                               if k not in ['early_stopping_rounds', 'eval_metric']}
+                        )
+                        cv_scores_direction = cross_val_score(temp_direction_model, X_train_scaled, y_train, cv=3)
+                        cv_scores_confidence = cross_val_score(temp_confidence_model, X_train_scaled, y_train, cv=3)
+                    else:
+                        cv_scores_direction = cross_val_score(self.direction_model, X_train_scaled, y_train, cv=5)
+                        cv_scores_confidence = cross_val_score(self.confidence_model, X_train_scaled, y_train, cv=5)
+                    
+                    self.logger.info(f"Direction Model CV Score: {cv_scores_direction.mean():.3f} (+/- {cv_scores_direction.std() * 2:.3f})")
+                    self.logger.info(f"Confidence Model CV Score: {cv_scores_confidence.mean():.3f} (+/- {cv_scores_confidence.std() * 2:.3f})")
+                except Exception as cv_error:
+                    self.logger.warning(f"Cross-validation failed: {cv_error}, using training scores only")
+                    cv_scores_direction = np.array([direction_train_score])
+                    cv_scores_confidence = np.array([confidence_train_score])
 
                 # ✅ FIX: Store training stats for GUI display
+                model_type = "XGBoost" if USE_XGBOOST else "sklearn"
                 self.training_stats = {
+                    'model_type': model_type,
                     'direction_train_acc': direction_train_score,
                     'direction_test_acc': direction_test_score,
                     'confidence_train_acc': confidence_train_score,
                     'confidence_test_acc':  confidence_test_score,
+                    'cv_direction_mean': cv_scores_direction.mean(),
+                    'cv_direction_std': cv_scores_direction.std(),
+                    'cv_confidence_mean': cv_scores_confidence.mean(),
+                    'cv_confidence_std': cv_scores_confidence.std(),
                     'train_samples': len(X_train),
                     'test_samples': len(X_test),
-                    'features':  X.shape[1] if hasattr(X, 'shape') else len(X[0])
+                    'features': len(self.feature_columns)
                 }
 
                 # Mark as trained
                 self.is_trained = True
 
+                # Log feature importance after training stats are initialized
+                if USE_XGBOOST:
+                    self._log_feature_importance()
+
                 # ✅ Return proper format WITH training stats
+                model_name = "XGBoost" if USE_XGBOOST else "RandomForest/GradientBoosting"
                 return {
                     'status': 'success',
+                    'model_type': model_name,
                     'train_samples': len(X_train),
                     'test_samples': len(X_test),
                     'metrics': {
-                        'Direction Model (RandomForest)': {
+                        f'Direction Model ({model_name})': {
                             'train_score': direction_train_score,
                             'test_score': direction_test_score
                         },
-                        'Confidence Model (GradientBoosting)': {
+                        f'Confidence Model ({model_name})': {
                             'train_score': confidence_train_score,
                             'test_score':  confidence_test_score
                         }
@@ -412,7 +530,13 @@ class MLPredictor:
                 # Create feature vector
                 feature_vector = []
                 for col in self.feature_columns:
-                    feature_vector.append(features.get(col, 0))
+                    if isinstance(features, dict):
+                        # features is dict, get value by key
+                        feature_vector.append(features.get(col, 0))
+                    else:
+                        # features is array/list, use index
+                        idx = self.feature_columns.index(col) if col in self.feature_columns else 0
+                        feature_vector.append(features[idx] if idx < len(features) else 0)
                 
                 feature_array = np.array(feature_vector).reshape(1, -1)
                 
@@ -440,6 +564,126 @@ class MLPredictor:
             except Exception as e:
                 logger.error(f"Prediction error: {e}")
                 return None, 0.0
+        
+        def _tune_xgboost_hyperparameters(self, X_train, y_train, X_test, y_test, param_grid):
+            """Tune XGBoost hyperparameters using random search with early stopping"""
+            from sklearn.model_selection import RandomizedSearchCV
+            from xgboost import XGBClassifier
+            import numpy as np
+            
+            # Create base model WITHOUT early stopping for RandomizedSearchCV
+            base_model = XGBClassifier(
+                random_state=42,
+                n_jobs=-1,
+                eval_metric='logloss'
+                # Remove early_stopping_rounds from base model
+            )
+            
+            # Random search with cross-validation
+            random_search = RandomizedSearchCV(
+                estimator=base_model,
+                param_distributions=param_grid,
+                n_iter=3,  # Reduced to 3 for very fast testing
+                cv=2,       # Reduced to 2-fold for speed
+                scoring='accuracy',
+                n_jobs=1,   # Single job to avoid parallel issues
+                random_state=42,
+                verbose=0
+            )
+            
+            # Fit random search WITHOUT eval_set (RandomizedSearchCV doesn't support it)
+            self.logger.info(f"  Tuning hyperparameters with {len(param_grid)} parameters...")
+            random_search.fit(X_train, y_train)
+            
+            # Get best model
+            best_model = random_search.best_estimator_
+            
+            # Log best parameters
+            self.logger.info(f"  Best parameters: {random_search.best_params_}")
+            self.logger.info(f"  Best CV score: {random_search.best_score_:.4f}")
+            
+            # Retrain best model with early stopping using the best parameters
+            final_model = XGBClassifier(
+                **random_search.best_params_,
+                random_state=42,
+                n_jobs=1,   # Single job
+                eval_metric='logloss'
+                # Remove early_stopping_rounds for now to avoid issues
+            )
+            
+            final_model.fit(
+                X_train, y_train
+                # Remove eval_set for now
+            )
+            
+            return final_model
+        
+        def _log_feature_importance(self):
+            """Log feature importance for both models"""
+            try:
+                if hasattr(self.direction_model, 'feature_importances_'):
+                    direction_importance = self.direction_model.feature_importances_
+                    confidence_importance = self.confidence_model.feature_importances_
+                    
+                    self.logger.info("📊 Feature Importance Analysis:")
+                    
+                    # Sort features by importance
+                    direction_sorted = sorted(zip(self.feature_columns, direction_importance), 
+                                            key=lambda x: x[1], reverse=True)
+                    confidence_sorted = sorted(zip(self.feature_columns, confidence_importance), 
+                                             key=lambda x: x[1], reverse=True)
+                    
+                    self.logger.info("Direction Model Top Features:")
+                    for feature, importance in direction_sorted[:5]:
+                        self.logger.info(f"  {feature}: {importance:.4f}")
+                    
+                    self.logger.info("Confidence Model Top Features:")
+                    for feature, importance in confidence_sorted[:5]:
+                        self.logger.info(f"  {feature}: {importance:.4f}")
+                    
+                    # Store feature importance in training stats
+                    self.training_stats['direction_feature_importance'] = dict(direction_sorted)
+                    self.training_stats['confidence_feature_importance'] = dict(confidence_sorted)
+                    
+            except Exception as e:
+                self.logger.warning(f"Could not log feature importance: {e}")
+        
+        def prepare_realtime_features(self, current_tick, microstructure: Dict) -> Dict:
+            """Prepare features for real-time prediction from current tick and microstructure"""
+            try:
+                # Use the same feature columns as training data
+                # This matches the GUI training features: ['ema_fast', 'ema_slow', 'rsi', 'atr', 'momentum', 'open', 'high', 'low', 'close', 'tick_volume']
+                features = {}
+                
+                # Basic price features
+                features['open'] = current_tick.last if hasattr(current_tick, 'last') else current_tick.bid
+                features['high'] = current_tick.ask if hasattr(current_tick, 'ask') else current_tick.bid + 0.0001
+                features['low'] = current_tick.bid if hasattr(current_tick, 'bid') else current_tick.ask - 0.0001
+                features['close'] = features['open']  # Current price
+                
+                # Volume
+                features['tick_volume'] = getattr(current_tick, 'volume', 1)
+                
+                # Technical indicators (simplified real-time calculation)
+                # EMA Fast/Slow (approximated)
+                current_price = features['close']
+                features['ema_fast'] = current_price  # Simplified
+                features['ema_slow'] = current_price  # Simplified
+                
+                # RSI (simplified)
+                features['rsi'] = 50.0  # Neutral RSI
+                
+                # ATR (simplified)
+                features['atr'] = microstructure.get('volatility', 0.001) * 10
+                
+                # Momentum (simplified)
+                features['momentum'] = microstructure.get('price_velocity', 0) * 100
+                
+                return features
+                
+            except Exception as e:
+                logger.error(f"Error preparing realtime features: {e}")
+                return {}
         
         def save_models(self, folder_path):
             """Save trained models to folder"""

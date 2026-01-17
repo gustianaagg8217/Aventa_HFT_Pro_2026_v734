@@ -1295,12 +1295,16 @@ class HFTProGUI:
                 from aventa_hft_core import UltraLowLatencyEngine
                 
                 bot['risk_manager'] = RiskManager(config)
-                bot['engine'] = UltraLowLatencyEngine(config['symbol'], config, bot['risk_manager'])
                 
+                # Create ML predictor first if enabled
+                ml_predictor = None
                 if config.get('enable_ml', False):
                     from ml_predictor import MLPredictor
-                    bot['ml_predictor'] = MLPredictor(config['symbol'], config)
+                    ml_predictor = MLPredictor(config['symbol'], config)
+                    bot['ml_predictor'] = ml_predictor
                     self.log_message(f"{self.active_bot_id}:  ML Predictor enabled", "INFO")
+                
+                bot['engine'] = UltraLowLatencyEngine(config['symbol'], config, bot['risk_manager'], ml_predictor)
                 
                 # Initialize and start
                 if bot['engine'].initialize():
