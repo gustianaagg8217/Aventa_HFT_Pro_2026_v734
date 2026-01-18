@@ -29,3 +29,4 @@ matplotlib>=3.5.0
 
 # Testing (Optional)
 pytest>=7.0.0
+nuitka

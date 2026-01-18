@@ -1043,20 +1043,30 @@ class HFTProGUI:
         def update_performance_display(self):
             """Update performance metrics display (called every 1 second)"""
             try:
-                # Check if active bot is running
+                # Check if active bot exists
                 if self.active_bot_id and self.active_bot_id in self.bots:
                     bot = self.bots[self.active_bot_id]
+                    
+                    # Always get daily stats from database for consistency (like Risk Metrics)
+                    daily_pnl = 0.0
+                    daily_trades = 0
+                    try:
+                        db_stats = self.trade_db.get_daily_stats(self.active_bot_id)
+                        daily_pnl = db_stats.get('total_pnl', 0)
+                        daily_trades = db_stats.get('total_trades', 0)
+                    except Exception as e:
+                        pass
                     
                     if bot['is_running'] and bot['engine']:
                         # ✅ FIX: Get performance snapshot from ACTIVE BOT's engine
                         snapshot = bot['engine'].get_performance_snapshot()
                         
-                        # Update trading metrics
+                        # Update trading metrics (use database for daily_pnl, snapshot for others)
                         self.perf_vars['trades_today'].set(str(snapshot.get('trades_today', 0)))
                         self.perf_vars['wins'].set(str(snapshot.get('wins', 0)))
                         self.perf_vars['losses'].set(str(snapshot.get('losses', 0)))
                         self.perf_vars['win_rate'].set(f"{snapshot.get('win_rate', 0):.1f}%")
-                        self.perf_vars['daily_pnl'].set(f"${snapshot.get('daily_pnl', 0):.2f}")
+                        self.perf_vars['daily_pnl'].set(f"${daily_pnl:.2f}")  # Use database for consistency
                         self.perf_vars['signals'].set(str(snapshot.get('signals_generated', 0)))
                         self.perf_vars['position'].set(snapshot.get('current_position', 'None'))
                         self.perf_vars['position_vol'].set(f"{snapshot.get('position_volume', 0):.2f}")
@@ -1083,8 +1093,24 @@ class HFTProGUI:
                         # Update chart
                         self.update_equity_chart()
                     else:
-                        # Bot not running - show zeros
-                        self.reset_performance_display()
+                        # Bot not running - show database data for historical metrics
+                        self.perf_vars['daily_pnl'].set(f"${daily_pnl:.2f}")
+                        self.perf_vars['trades_today'].set(str(daily_trades))
+                        # Reset other real-time metrics
+                        self.perf_vars['wins'].set("0")
+                        self.perf_vars['losses'].set("0")
+                        self.perf_vars['win_rate'].set("0.0%")
+                        self.perf_vars['signals'].set("0")
+                        self.perf_vars['position'].set("None")
+                        self.perf_vars['position_vol'].set("0.00")
+                        self.perf_vars['balance'].set("$0.00")
+                        self.perf_vars['equity'].set("$0.00")
+                        self.perf_vars['floating'].set("$0.00")
+                        self.perf_vars['latency_avg'].set("0.0 μs")
+                        self.perf_vars['latency_max'].set("0.0 μs")
+                        self.perf_vars['exec_avg'].set("0.00 ms")
+                        self.perf_vars['exec_max'].set("0.00 ms")
+                        self.perf_vars['ticks'].set("0")
                 else:
                     # No active bot
                     self.reset_performance_display()
@@ -2418,19 +2444,28 @@ class HFTProGUI:
                 results_frame = ttk.LabelFrame(main_container, text="📊 Backtest Results", padding=10)
                 results_frame.pack(fill=tk.X, pady=(0, 10))
 
-                # Initialize result variables
+                # Initialize result variables with enhanced metrics
                 self.bt_results = {
                     'total_trades': tk.StringVar(value="0"),
                     'wins': tk.StringVar(value="0"),
                     'losses': tk.StringVar(value="0"),
                     'win_rate': tk.StringVar(value="0.0%"),
                     'total_pnl': tk.StringVar(value="$0.00"),
+                    'net_pnl': tk.StringVar(value="$0.00"),
                     'profit_factor': tk.StringVar(value="0.00"),
                     'max_drawdown': tk.StringVar(value="0.0%"),
                     'sharpe_ratio': tk.StringVar(value="0.00"),
+                    'sortino_ratio': tk.StringVar(value="0.00"),
+                    'calmar_ratio': tk.StringVar(value="0.00"),
                     'best_trade': tk.StringVar(value="$0.00"),
                     'worst_trade': tk.StringVar(value="$0.00"),
-                    'avg_trade':  tk.StringVar(value="$0.00"),
+                    'avg_trade': tk.StringVar(value="$0.00"),
+                    'avg_win': tk.StringVar(value="$0.00"),
+                    'avg_loss': tk.StringVar(value="$0.00"),
+                    'expectancy': tk.StringVar(value="$0.00"),
+                    'return_pct': tk.StringVar(value="0.0%"),
+                    'annualized_return': tk.StringVar(value="0.0%"),
+                    'total_commission': tk.StringVar(value="$0.00"),
                     'avg_duration': tk.StringVar(value="0 min"),
                 }
 
@@ -2462,6 +2497,22 @@ class HFTProGUI:
                 self.create_bt_result(res_row3, "Avg Trade:", self.bt_results['avg_trade'], width=15)
                 self.create_bt_result(res_row3, "Avg Duration:", self.bt_results['avg_duration'], width=15)
 
+                # Row 4 - Enhanced metrics
+                res_row4 = ttk.Frame(results_grid)
+                res_row4.pack(fill=tk.X, pady=2)
+                self.create_bt_result(res_row4, "Net P&L:", self.bt_results['net_pnl'], width=15)
+                self.create_bt_result(res_row4, "Return %:", self.bt_results['return_pct'], width=12)
+                self.create_bt_result(res_row4, "Sortino:", self.bt_results['sortino_ratio'], width=10)
+                self.create_bt_result(res_row4, "Calmar:", self.bt_results['calmar_ratio'], width=10)
+
+                # Row 5 - More metrics
+                res_row5 = ttk.Frame(results_grid)
+                res_row5.pack(fill=tk.X, pady=2)
+                self.create_bt_result(res_row5, "Avg Win:", self.bt_results['avg_win'], width=12)
+                self.create_bt_result(res_row5, "Avg Loss:", self.bt_results['avg_loss'], width=12)
+                self.create_bt_result(res_row5, "Expectancy:", self.bt_results['expectancy'], width=12)
+                self.create_bt_result(res_row5, "Commission:", self.bt_results['total_commission'], width=12)
+
                 # === TRADE HISTORY TABLE ===
                 trades_frame = ttk.LabelFrame(main_container, text="📋 Trade History", padding=10)
                 trades_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
@@ -2474,9 +2525,9 @@ class HFTProGUI:
                 tree_scroll_y = ttk.Scrollbar(tree_container, orient=tk.VERTICAL)
                 tree_scroll_x = ttk.Scrollbar(tree_container, orient=tk.HORIZONTAL)
 
-                # Treeview
-                columns = ('#', 'Date/Time', 'Type', 'Entry', 'Exit', 'Profit', 'Duration')
-                self.bt_trades_tree = ttk.Treeview(tree_container, columns=columns, show='headings', 
+                # Treeview with enhanced columns
+                columns = ('#', 'Date/Time', 'Type', 'Entry', 'Exit', 'Profit', 'Duration', 'Reason', 'Volume', 'Commission')
+                self.bt_trades_tree = ttk.Treeview(tree_container, columns=columns, show='headings',
                                                 height=10,
                                                 yscrollcommand=tree_scroll_y.set,
                                                 xscrollcommand=tree_scroll_x.set)
@@ -2492,15 +2543,21 @@ class HFTProGUI:
                 self.bt_trades_tree.heading('Exit', text='Exit')
                 self.bt_trades_tree.heading('Profit', text='Profit')
                 self.bt_trades_tree.heading('Duration', text='Duration')
+                self.bt_trades_tree.heading('Reason', text='Exit Reason')
+                self.bt_trades_tree.heading('Volume', text='Volume')
+                self.bt_trades_tree.heading('Commission', text='Commission')
 
                 # Define column widths
                 self.bt_trades_tree.column('#', width=40, anchor=tk.CENTER)
-                self.bt_trades_tree.column('Date/Time', width=150, anchor=tk.W)
-                self.bt_trades_tree.column('Type', width=60, anchor=tk.CENTER)
+                self.bt_trades_tree.column('Date/Time', width=140, anchor=tk.W)
+                self.bt_trades_tree.column('Type', width=50, anchor=tk.CENTER)
                 self.bt_trades_tree.column('Entry', width=80, anchor=tk.E)
                 self.bt_trades_tree.column('Exit', width=80, anchor=tk.E)
-                self.bt_trades_tree.column('Profit', width=100, anchor=tk.E)
-                self.bt_trades_tree.column('Duration', width=100, anchor=tk.CENTER)
+                self.bt_trades_tree.column('Profit', width=90, anchor=tk.E)
+                self.bt_trades_tree.column('Duration', width=80, anchor=tk.CENTER)
+                self.bt_trades_tree.column('Reason', width=120, anchor=tk.W)
+                self.bt_trades_tree.column('Volume', width=70, anchor=tk.E)
+                self.bt_trades_tree.column('Commission', width=90, anchor=tk.E)
 
                 # Pack treeview and scrollbars
                 self.bt_trades_tree.grid(row=0, column=0, sticky='nsew')
@@ -2585,41 +2642,51 @@ class HFTProGUI:
                 pass
 
         def display_backtest_results(self, results):
-            """Display backtest results in UI"""
+            """Display comprehensive backtest results in UI"""
             try:
-                # Update result variables
+                # Update result variables with enhanced metrics
                 self.bt_results['total_trades'].set(str(results.get('total_trades', 0)))
                 self.bt_results['wins'].set(str(results.get('wins', 0)))
                 self.bt_results['losses'].set(str(results.get('losses', 0)))
                 self.bt_results['win_rate'].set(f"{results.get('win_rate', 0):.1f}%")
                 self.bt_results['total_pnl'].set(f"${results.get('total_pnl', 0):.2f}")
+                self.bt_results['net_pnl'].set(f"${results.get('net_pnl', 0):.2f}")
                 self.bt_results['profit_factor'].set(f"{results.get('profit_factor', 0):.2f}")
-                self.bt_results['max_drawdown'].set(f"{results.get('max_drawdown', 0):.2f}%")
+                self.bt_results['max_drawdown'].set(f"{results.get('max_drawdown_pct', 0):.2f}%")
                 self.bt_results['sharpe_ratio'].set(f"{results.get('sharpe_ratio', 0):.2f}")
+                self.bt_results['sortino_ratio'].set(f"{results.get('sortino_ratio', 0):.2f}")
+                self.bt_results['calmar_ratio'].set(f"{results.get('calmar_ratio', 0):.2f}")
                 self.bt_results['best_trade'].set(f"${results.get('best_trade', 0):.2f}")
                 self.bt_results['worst_trade'].set(f"${results.get('worst_trade', 0):.2f}")
                 self.bt_results['avg_trade'].set(f"${results.get('avg_trade', 0):.2f}")
+                self.bt_results['avg_win'].set(f"${results.get('avg_win', 0):.2f}")
+                self.bt_results['avg_loss'].set(f"${results.get('avg_loss', 0):.2f}")
+                self.bt_results['expectancy'].set(f"${results.get('expectancy', 0):.2f}")
+                self.bt_results['return_pct'].set(f"{results.get('return_pct', 0):.2f}%")
+                self.bt_results['annualized_return'].set(f"{results.get('annualized_return', 0):.2f}%")
+                self.bt_results['total_commission'].set(f"${results.get('total_commission', 0):.2f}")
                 self.bt_results['avg_duration'].set(results.get('avg_duration', '0 min'))
-                
+
                 # Clear and populate trade history table
                 for item in self.bt_trades_tree.get_children():
                     self.bt_trades_tree.delete(item)
-                
+
                 # Store trades for export
                 self.bt_trade_list = results.get('trades', [])
-                
-                # Populate table
+
+                # Populate table with enhanced trade info
                 for i, trade in enumerate(self.bt_trade_list, 1):
                     profit = trade.get('profit', 0)
                     tag = 'profit' if profit > 0 else 'loss'
-                    
+
                     # Format datetime
                     dt = trade.get('entry_time', datetime.now())
                     if isinstance(dt, str):
                         dt_str = dt
                     else:
                         dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
-                    
+
+                    # Enhanced trade display
                     self.bt_trades_tree.insert('', 'end', values=(
                         i,
                         dt_str,
@@ -2627,11 +2694,27 @@ class HFTProGUI:
                         f"{trade.get('entry_price', 0):.5f}",
                         f"{trade.get('exit_price', 0):.5f}",
                         f"${profit:.2f}",
-                        trade.get('duration', '')
+                        trade.get('duration', ''),
+                        trade.get('reason', ''),
+                        f"{trade.get('volume', 0):.2f}",
+                        f"${trade.get('commission', 0):.2f}"
                     ), tags=(tag,))
-                
-                self.add_bt_log(f"✓ Results displayed:  {len(self.bt_trade_list)} trades", "SUCCESS")
-                
+
+                # Add summary statistics to log
+                total_trades = results.get('total_trades', 0)
+                if total_trades > 0:
+                    self.add_bt_log(f"📊 Performance Summary:", "INFO")
+                    self.add_bt_log(f"   • Net P&L: ${results.get('net_pnl', 0):.2f} (after commissions)", "INFO")
+                    self.add_bt_log(f"   • Return: {results.get('return_pct', 0):.2f}%", "INFO")
+                    self.add_bt_log(f"   • Annualized Return: {results.get('annualized_return', 0):.2f}%", "INFO")
+                    self.add_bt_log(f"   • Sharpe Ratio: {results.get('sharpe_ratio', 0):.2f}", "INFO")
+                    self.add_bt_log(f"   • Sortino Ratio: {results.get('sortino_ratio', 0):.2f}", "INFO")
+                    self.add_bt_log(f"   • Calmar Ratio: {results.get('calmar_ratio', 0):.2f}", "INFO")
+                    self.add_bt_log(f"   • Expectancy: ${results.get('expectancy', 0):.2f} per trade", "INFO")
+                    self.add_bt_log(f"   • Total Commission: ${results.get('total_commission', 0):.2f}", "INFO")
+
+                self.add_bt_log(f"✓ Results displayed: {len(self.bt_trade_list)} trades", "SUCCESS")
+
             except Exception as e:
                 self.log_message(f"Display results error: {e}", "ERROR")
                 import traceback
@@ -2820,19 +2903,29 @@ class HFTProGUI:
                 self.bt_trade_list = []
                 for item in self.bt_trades_tree.get_children():
                     self.bt_trades_tree.delete(item)
-                
-                # Reset result displays
-                for key in self.bt_results: 
-                    if key == 'total_trades':
-                        self.bt_results[key].set("0")
-                    elif 'pct' in key or 'rate' in key:
-                        self.bt_results[key].set("0.0%")
-                    elif 'ratio' in key or 'factor' in key:
-                        self.bt_results[key].set("0.00")
-                    elif key == 'avg_duration':
-                        self.bt_results[key].set("0 min")
-                    else:
-                        self.bt_results[key].set("$0.00")
+
+                # Reset result displays with proper types
+                self.bt_results['total_trades'].set("0")
+                self.bt_results['wins'].set("0")
+                self.bt_results['losses'].set("0")
+                self.bt_results['win_rate'].set("0.0%")
+                self.bt_results['total_pnl'].set("$0.00")
+                self.bt_results['net_pnl'].set("$0.00")
+                self.bt_results['profit_factor'].set("0.00")
+                self.bt_results['max_drawdown'].set("0.0%")
+                self.bt_results['sharpe_ratio'].set("0.00")
+                self.bt_results['sortino_ratio'].set("0.00")
+                self.bt_results['calmar_ratio'].set("0.00")
+                self.bt_results['best_trade'].set("$0.00")
+                self.bt_results['worst_trade'].set("$0.00")
+                self.bt_results['avg_trade'].set("$0.00")
+                self.bt_results['avg_win'].set("$0.00")
+                self.bt_results['avg_loss'].set("$0.00")
+                self.bt_results['expectancy'].set("$0.00")
+                self.bt_results['return_pct'].set("0.0%")
+                self.bt_results['annualized_return'].set("0.0%")
+                self.bt_results['total_commission'].set("$0.00")
+                self.bt_results['avg_duration'].set("0 min")
 
                 # Reset progress
                 self.bt_progress['value'] = 0
@@ -2844,7 +2937,7 @@ class HFTProGUI:
                 self.add_bt_log("="*60, "INFO")
                 self.add_bt_log(f"📅 Period: {self.bt_start_date_var.get()} to {self.bt_end_date_var.get()}", "INFO")
                 self.add_bt_log(f"📊 Symbol: {symbol}", "INFO")
-                self.add_bt_log(f"💰 Initial Balance: ${initial_balance: ,.2f}", "INFO")
+                self.add_bt_log(f"💰 Initial Balance: ${initial_balance:,.2f}", "INFO")
                 self.add_bt_log(f"📆 Duration: {days_diff} days", "INFO")
 
                 # ✅ CRITICAL FIX: Create thread-safe callback
