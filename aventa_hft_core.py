@@ -1228,6 +1228,23 @@ class UltraLowLatencyEngine:
                 
                 # Send Telegram signal for open position
                 if self.telegram_callback:
+                    # Get account info for telegram signal
+                    try:
+                        account_info = mt5.account_info()
+                        if account_info:
+                            balance = account_info.balance
+                            equity = account_info.equity
+                            free_margin = account_info.margin_free
+                            margin = account_info.margin
+                            margin_level = (equity / margin) * 100 if margin and margin > 0 else 0
+                            logger.info(f"Account info fetched for open: Balance={balance:.2f}, Equity={equity:.2f}, Free Margin={free_margin:.2f}, Margin Level={margin_level:.2f}%")
+                        else:
+                            logger.warning("MT5 account_info() returned None during position open")
+                            balance = equity = free_margin = margin_level = None
+                    except Exception as e:
+                        logger.error(f"Failed to get account info during position open: {e}")
+                        balance = equity = free_margin = margin_level = None
+                    
                     self.telegram_callback(
                         signal_type="open_position",
                         symbol=self.symbol,
@@ -1235,7 +1252,11 @@ class UltraLowLatencyEngine:
                         volume=signal.volume,
                         price=signal.price,
                         sl=signal.stop_loss,
-                        tp=signal.take_profit
+                        tp=signal.take_profit,
+                        balance=balance,
+                        equity=equity,
+                        free_margin=free_margin,
+                        margin_level=margin_level
                     )
                 
                 return True
@@ -1720,8 +1741,11 @@ class UltraLowLatencyEngine:
             return 0.0
 
         pnl = 0.0
+        magic = self.config.get('magic_number', 2026002)
         for d in deals:
-            pnl += d.profit  # sudah termasuk commission & swap
+            # ✅ FILTER BY MAGIC NUMBER - only count this bot's P&L
+            if d.magic == magic:
+                pnl += d.profit  # sudah termasuk commission & swap
 
         return pnl
 
@@ -1750,9 +1774,10 @@ class UltraLowLatencyEngine:
             return 0
 
         trade_count = 0
+        magic = self.config.get('magic_number', 2026002)
         for d in deals:
-            # Hitung hanya DEAL IN (open posisi)
-            if d.entry == mt5.DEAL_ENTRY_IN:
+            # ✅ FILTER BY MAGIC NUMBER - only count this bot's trades
+            if d.magic == magic and d.entry == mt5.DEAL_ENTRY_IN:
                 trade_count += 1
 
         return trade_count
@@ -1805,7 +1830,13 @@ class UltraLowLatencyEngine:
         losses = 0
         pnl = 0.0
 
+        magic = self.config.get('magic_number', 2026002)
+
         for d in deals:
+            # ✅ FILTER BY MAGIC NUMBER - only count this bot's trades
+            if d.magic != magic:
+                continue
+                
             pnl += d.profit
             if d.entry == mt5.DEAL_ENTRY_IN:
                 trades += 1
@@ -1851,6 +1882,76 @@ class UltraLowLatencyEngine:
         p = positions[0]
         pos_type = "BUY" if p.type == mt5.ORDER_TYPE_BUY else "SELL"
         return pos_type, p.volume
+
+    def get_performance_snapshot(self):
+        """Get comprehensive performance snapshot for GUI display"""
+        try:
+            # Get account info
+            account_info = self.account_cache.get_info()
+            
+            # Get today's trade statistics from MT5 history (more accurate)
+            trades_today, wins, losses, daily_pnl = self.get_today_trade_stats()
+            
+            # Calculate win rate
+            total_trades = wins + losses
+            win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
+            
+            # Get current position
+            position_type, position_volume = self.get_current_position_info()
+            
+            # Calculate floating P&L
+            floating_pnl = 0.0
+            positions = mt5.positions_get(symbol=self.symbol)
+            if positions:
+                for pos in positions:
+                    floating_pnl += pos.profit
+            
+            # Calculate latency metrics
+            latency_avg = sum(self.latency_samples) / len(self.latency_samples) if self.latency_samples else 0
+            latency_max = max(self.latency_samples) if self.latency_samples else 0
+            
+            # Calculate execution time metrics
+            exec_avg = sum(self.execution_times) / len(self.execution_times) if self.execution_times else 0
+            exec_max = max(self.execution_times) if self.execution_times else 0
+            
+            return {
+                'trades_today': trades_today,
+                'wins': wins,
+                'losses': losses,
+                'win_rate': win_rate,
+                'daily_pnl': daily_pnl,
+                'signals_generated': self.signals_generated,
+                'current_position': position_type,
+                'position_volume': position_volume,
+                'balance': account_info.balance if account_info else 0.0,
+                'equity': account_info.equity if account_info else 0.0,
+                'floating': floating_pnl,
+                'tick_latency_avg': latency_avg,
+                'tick_latency_max': latency_max,
+                'exec_time_avg': exec_avg,
+                'exec_time_max': exec_max,
+                'ticks_processed': len(self.tick_buffer)
+            }
+        except Exception as e:
+            logger.error(f"Error getting performance snapshot: {e}")
+            return {
+                'trades_today': 0,
+                'wins': 0,
+                'losses': 0,
+                'win_rate': 0.0,
+                'daily_pnl': 0.0,
+                'signals_generated': 0,
+                'current_position': 'None',
+                'position_volume': 0.0,
+                'balance': 0.0,
+                'equity': 0.0,
+                'floating': 0.0,
+                'tick_latency_avg': 0,
+                'tick_latency_max': 0,
+                'exec_time_avg': 0,
+                'exec_time_max': 0,
+                'ticks_processed': 0
+            }
 
 
 if __name__ == "__main__":

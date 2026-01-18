@@ -156,6 +156,17 @@ class HFTProGUI:
                     self.active_bot_id = active_bot
                     self.load_bot_config_to_gui(active_bot)
                 
+                # Restore telegram bots for bots that have telegram config
+                for bot_id, bot_data in self.bots.items():
+                    config = bot_data['config']
+                    if 'telegram' in config:
+                        telegram_config = config['telegram']
+                        token = telegram_config.get('token', '')
+                        chat_ids = telegram_config.get('chat_ids', [])
+                        if token and chat_ids:
+                            self.telegram_bots[bot_id] = TelegramBot(token, chat_ids)
+                            self.log_message(f"✓ Telegram bot restored for {bot_id}", "INFO")
+                
                 self.log_message("✓ Session restored", "SUCCESS")
                 
                 # Update Telegram bot selector if it exists
@@ -265,6 +276,9 @@ class HFTProGUI:
             self.bots = {}
             self.active_bot_id = None
             
+            # Telegram bot instances
+            self.telegram_bots = {}
+            
             # For backward compatibility
             self.engine = None
             self.risk_manager = None
@@ -284,6 +298,26 @@ class HFTProGUI:
                 'timestamps': deque(maxlen=300),
                 'equity':  deque(maxlen=300),
                 'balance': deque(maxlen=300),
+            }
+            
+            # Performance display variables
+            self.perf_vars = {
+                'trades_today': tk.StringVar(value="0"),
+                'wins': tk.StringVar(value="0"),
+                'losses': tk.StringVar(value="0"),
+                'win_rate': tk.StringVar(value="0.00%"),
+                'daily_pnl': tk.StringVar(value="$0.00"),
+                'signals': tk.StringVar(value="0"),
+                'position': tk.StringVar(value="None"),
+                'position_vol': tk.StringVar(value="0.00"),
+                'balance': tk.StringVar(value="$0.00"),
+                'equity': tk.StringVar(value="$0.00"),
+                'floating': tk.StringVar(value="$0.00"),
+                'latency_avg': tk.StringVar(value="0.00ms"),
+                'latency_max': tk.StringVar(value="0.00ms"),
+                'ticks': tk.StringVar(value="0"),
+                'exec_avg': tk.StringVar(value="0.00ms"),
+                'exec_max': tk.StringVar(value="0.00ms"),
             }
             
             # Chart references
@@ -1308,7 +1342,7 @@ class HFTProGUI:
                     self.log_message(f"{self.active_bot_id}:  ML Predictor enabled", "INFO")
                 
                 bot['engine'] = UltraLowLatencyEngine(config['symbol'], config, bot['risk_manager'], ml_predictor, 
-                                                telegram_callback=lambda **data: self.send_telegram_signal(bot_id=bot_id, **data))
+                                                telegram_callback=lambda **data: self.send_telegram_signal(bot_id=self.active_bot_id, **data))
                 
                 # Initialize and start
                 if bot['engine'].initialize():
@@ -3376,8 +3410,14 @@ This is a test message from Aventa HFT Pro 2026"""
                 self.update_telegram_status(error_msg)
                 self.log_message(error_msg, "ERROR")
 
-        def format_open_position_signal(self, bot_id, symbol, order_type, volume, price, sl, tp):
+        def format_open_position_signal(self, bot_id, symbol, order_type, volume, price, sl, tp, balance=None, equity=None, free_margin=None, margin_level=None):
             """Format open position signal message"""
+            # Format account info with N/A fallback
+            balance_str = f"${balance:.2f}" if balance is not None else "N/A"
+            equity_str = f"${equity:.2f}" if equity is not None else "N/A"
+            free_margin_str = f"${free_margin:.2f}" if free_margin is not None else "N/A"
+            margin_level_str = f"{margin_level:.2f}%" if margin_level is not None else "N/A"
+
             return f"""🔵 OPEN POSITION SIGNAL
 
 🤖 Bot: {bot_id}
@@ -3387,6 +3427,13 @@ This is a test message from Aventa HFT Pro 2026"""
 💰 Price: ${price:.5f}
 🛡️ Stop Loss: ${sl:.5f}
 🎯 Take Profit: ${tp:.5f}
+
+💳 **Account Summary:**
+💵 Balance: {balance_str}
+📊 Equity: {equity_str}
+🆓 Free Margin: {free_margin_str}
+📊 Margin Level: {margin_level_str}
+
 🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 🚀 Position opened successfully!"""
