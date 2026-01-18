@@ -157,6 +157,14 @@ class HFTProGUI:
                     self.load_bot_config_to_gui(active_bot)
                 
                 self.log_message("✓ Session restored", "SUCCESS")
+                
+                # Update Telegram bot selector if it exists
+                try:
+                    if hasattr(self, 'telegram_bot_selector'):
+                        self.update_telegram_bot_selector()
+                except:
+                    pass
+                
                 return True
             except Exception as e: 
                 self.log_message(f"Load session error: {e}", "WARNING")
@@ -1386,8 +1394,12 @@ class HFTProGUI:
                 
                 self.log_message(f"✓ {bot_id} added successfully", "SUCCESS")
                 
-                # Update Telegram bot selector
-                self.update_telegram_bot_selector()
+                # Update Telegram bot selector if Telegram tab is already built
+                try:
+                    if hasattr(self, 'telegram_bot_selector'):
+                        self.update_telegram_bot_selector()
+                except:
+                    pass
                 
             except Exception as e:
                 self.log_message(f"Add bot error: {e}", "ERROR")
@@ -1502,8 +1514,12 @@ class HFTProGUI:
                 
                 self.log_message(f"✓ {bot_id} removed successfully", "SUCCESS")
                 
-                # Update Telegram bot selector
-                self.update_telegram_bot_selector()
+                # Update Telegram bot selector if Telegram tab is already built
+                try:
+                    if hasattr(self, 'telegram_bot_selector'):
+                        self.update_telegram_bot_selector()
+                except:
+                    pass
                 
             except Exception as e:
                 self.log_message(f"Remove bot error: {e}", "ERROR")
@@ -2815,6 +2831,10 @@ class HFTProGUI:
                 # Build Strategy Tester tab when first opened
                 if "Strategy" in tab_text and not hasattr(self, 'bt_log_text'):
                     self.build_strategy_tab()
+                
+                # Update Telegram bot selector when Telegram tab is opened
+                if "Telegram" in tab_text and hasattr(self, 'telegram_bot_selector'):
+                    self.update_telegram_bot_selector()
                     
             except Exception as e:  
                 self.log_message(f"Tab change error: {e}", "ERROR")
@@ -2930,7 +2950,7 @@ class HFTProGUI:
                 bot_frame.pack(fill=tk.X, padx=10, pady=5)
 
                 ttk.Label(bot_frame, text="Select Bot:", font=('Segoe UI', 10)).pack(side=tk.LEFT, padx=5)
-                self.telegram_bot_selector = ttk.Combobox(bot_frame, values=list(self.bots.keys()),
+                self.telegram_bot_selector = ttk.Combobox(bot_frame, values=[],
                                                         state='readonly', width=20)
                 self.telegram_bot_selector.pack(side=tk.LEFT, padx=5)
                 self.telegram_bot_selector.bind('<<ComboboxSelected>>', self.on_telegram_bot_selected)
@@ -2968,6 +2988,11 @@ class HFTProGUI:
                 self.save_telegram_config_btn = ttk.Button(buttons_frame, text="💾 Save Configuration",
                                                          command=self.save_telegram_config, width=20)
                 self.save_telegram_config_btn.pack(side=tk.LEFT, padx=5)
+
+                # Add Load Configuration button
+                self.load_telegram_config_btn = ttk.Button(buttons_frame, text="📁 Load Configuration",
+                                                         command=self.load_telegram_config, width=20)
+                self.load_telegram_config_btn.pack(side=tk.LEFT, padx=5)
 
                 # Status Frame
                 status_frame = ttk.LabelFrame(scrollable_frame, text="📊 Status", padding=10)
@@ -3019,9 +3044,9 @@ class HFTProGUI:
             try:
                 selected_bot = self.telegram_bot_selector.get()
                 if selected_bot and selected_bot in self.bots:
-                    # Load existing telegram config for this bot
-                    config = self.config_manager.load_config(selected_bot)
-                    telegram_config = config.get('telegram', {})
+                    # Load existing telegram config for this bot from bot's config
+                    bot_config = self.bots[selected_bot]['config']
+                    telegram_config = bot_config.get('telegram', {})
 
                     self.telegram_token_var.set(telegram_config.get('token', ''))
                     self.telegram_chat_ids_var.set(','.join(telegram_config.get('chat_ids', [])))
@@ -3155,6 +3180,8 @@ This is a test message from Aventa HFT Pro 2026"""
 
                 # Load existing config
                 config = self.config_manager.load_config(selected_bot)
+                if config is None:
+                    config = {}
 
                 # Update telegram config
                 config['telegram'] = {
@@ -3180,6 +3207,55 @@ This is a test message from Aventa HFT Pro 2026"""
                 self.update_telegram_status(error_msg)
                 messagebox.showerror("Error", error_msg)
 
+        def load_telegram_config(self):
+            """Load Telegram configuration from file for selected bot"""
+            try:
+                selected_bot = self.telegram_bot_selector.get()
+                if not selected_bot or selected_bot not in self.bots:
+                    messagebox.showerror("Error", "Please select a bot first!")
+                    return
+
+                filename = filedialog.askopenfilename(
+                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                    title=f"Load Telegram Config for {selected_bot}"
+                )
+                if filename:
+                    with open(filename, 'r') as f:
+                        loaded_config = json.load(f)
+                    
+                    # Extract telegram config
+                    telegram_config = loaded_config.get('telegram', {})
+                    if not telegram_config:
+                        messagebox.showwarning("Warning", "No Telegram configuration found in file!")
+                        return
+                    
+                    # Update GUI variables
+                    self.telegram_token_var.set(telegram_config.get('token', ''))
+                    self.telegram_chat_ids_var.set(','.join(telegram_config.get('chat_ids', [])))
+                    
+                    # Update bot's config
+                    bot_config = self.config_manager.load_config(selected_bot)
+                    if bot_config is None:
+                        bot_config = {}
+                    bot_config['telegram'] = telegram_config
+                    self.config_manager.save_config(selected_bot, bot_config)
+                    
+                    # Update telegram bot instance
+                    token = telegram_config.get('token', '')
+                    chat_ids = telegram_config.get('chat_ids', [])
+                    if selected_bot not in self.telegram_bots:
+                        self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+                    else:
+                        self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+                    
+                    self.update_telegram_status(f"✅ Configuration loaded for bot: {selected_bot}")
+                    messagebox.showinfo("Success", f"Telegram configuration loaded for {selected_bot}!")
+
+            except Exception as e:
+                error_msg = f"Load failed: {str(e)}"
+                self.update_telegram_status(error_msg)
+                messagebox.showerror("Error", error_msg)
+
         def update_telegram_status(self, message):
             """Update telegram status display"""
             try:
@@ -3194,18 +3270,32 @@ This is a test message from Aventa HFT Pro 2026"""
             try:
                 if hasattr(self, 'telegram_bot_selector'):
                     current_selection = self.telegram_bot_selector.get()
-                    self.telegram_bot_selector['values'] = list(self.bots.keys())
+                    bot_list = list(self.bots.keys())
+                    self.log_message(f"Setting telegram bot selector values to: {bot_list}", "DEBUG")
+                    self.telegram_bot_selector['values'] = bot_list
+                    
+                    # Force GUI update
+                    self.root.update_idletasks()
                     
                     # Restore selection if it still exists
                     if current_selection in self.bots:
                         self.telegram_bot_selector.set(current_selection)
+                        self.log_message(f"Restored selection: {current_selection}", "DEBUG")
                     elif self.bots:
                         # Select first bot if current selection is invalid
-                        self.telegram_bot_selector.set(list(self.bots.keys())[0])
+                        first_bot = list(self.bots.keys())[0]
+                        self.telegram_bot_selector.set(first_bot)
                         # Load config for the selected bot
                         self.on_telegram_bot_selected()
+                        self.log_message(f"Selected first bot: {first_bot}", "DEBUG")
                     else:
                         self.telegram_bot_selector.set('')
+                        self.log_message("No bots available, cleared selection", "DEBUG")
+                        
+                    # Force another GUI update
+                    self.root.update_idletasks()
+                else:
+                    self.log_message("Telegram bot selector not found", "WARNING")
             except Exception as e:
                 self.log_message(f"Update telegram bot selector error: {e}", "ERROR")
 
