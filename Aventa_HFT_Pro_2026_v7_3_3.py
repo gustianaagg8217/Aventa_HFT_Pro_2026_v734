@@ -1305,7 +1305,7 @@ class HFTProGUI:
                     self.log_message(f"{self.active_bot_id}:  ML Predictor enabled", "INFO")
                 
                 bot['engine'] = UltraLowLatencyEngine(config['symbol'], config, bot['risk_manager'], ml_predictor, 
-                                                telegram_callback=lambda **data: self.send_telegram_signal(bot_id=self.active_bot_id, **data))
+                                                telegram_callback=lambda **data: self.send_telegram_signal(bot_id=bot_id, **data))
                 
                 # Initialize and start
                 if bot['engine'].initialize():

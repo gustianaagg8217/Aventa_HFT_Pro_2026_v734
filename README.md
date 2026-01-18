@@ -226,13 +226,28 @@ Sistem akan:
 ```
 🤖 Bot: Bot_5
 📊 Symbol: BTCUSD.futu
-🎫 Ticket: 12345678
+🎫 Ticket: 36185049
 💰 Profit: $0.15
 📦 Volume: 0.01
-🕐 Timestamp: 2026-01-18 12:32:25
 
 ✅ Position closed successfully!
+
+💳 **Account Summary:**
+💵 Balance: $6788.35
+📊 Equity: $6788.35
+🆓 Free Margin: $6588.36
+📊 Margin Level: 3563.18%
+📊 Total Lot Today: 0.76
+
+🕐 Timestamp: 2026-01-18 14:47:04
 ```
+
+### **Account Summary Features:**
+- **💵 Balance**: Current account balance
+- **📊 Equity**: Account equity (Balance + Floating P&L)
+- **🆓 Free Margin**: Available margin for new positions
+- **📊 Margin Level**: (Equity/Margin) × 100 (%)
+- **📊 Total Lot Today**: Cumulative volume traded today
 
 ### **Close Position Triggers:**
 - ✅ **Take Profit Hit**: Automatic close when TP target reached
@@ -453,6 +468,9 @@ cp configs/ configs_backup/
 - ✅ **Manual Close Notifications**: GUI close button now sends Telegram alerts
 - ✅ **Async Error Handling**: Improved Telegram API error handling
 - ✅ **Thread-safe Operations**: Background thread for Telegram sending
+- ✅ **Account Information in Close Signals**: Added Balance, Equity, Free Margin, Margin Level
+- ✅ **Daily Volume Tracking**: Added Total Lot Today to close position notifications
+- ✅ **Real-time Account Summary**: Live MT5 account data in Telegram alerts
 
 ### **Notification Coverage:**
 - **OPEN POSITION**: All new trades (BUY/SELL)
