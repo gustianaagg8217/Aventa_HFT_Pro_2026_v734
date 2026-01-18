@@ -2193,15 +2193,31 @@ class HFTProGUI:
                                 current_exposure = 0.0
                                 position_count = 0
                             
+                            # Get daily P&L from database if available
+                            daily_pnl = 0.0
+                            daily_trades = 0
+                            try:
+                                db_stats = self.trade_db.get_daily_stats(self.active_bot_id)
+                                daily_pnl = db_stats.get('total_pnl', 0)
+                                daily_trades = db_stats.get('total_trades', 0)
+                            except Exception as e:
+                                pass
+                            
                             # Update basic displays
                             self.risk_vars['current_exposure'].set(f"${current_exposure:.2f}")
                             self.risk_vars['position_count'].set(str(position_count))
+                            self.risk_vars['daily_pnl'].set(f"${daily_pnl:.2f}")
                             
-                            # Reset bot-specific metrics
-                            self.risk_vars['daily_pnl'].set("$0.00")
-                            self.risk_vars['daily_pnl_pct'].set("0.0%")
-                            self.risk_vars['daily_trades'].set("0")
-                            self.risk_vars['trades_pct'].set("0.0%")
+                            # Calculate percentages for daily P&L
+                            max_loss = self.bots[self.active_bot_id]['config'].get('max_daily_loss', 1000)
+                            pnl_pct = (abs(daily_pnl) / max_loss * 100) if max_loss > 0 else 0
+                            self.risk_vars['daily_pnl_pct'].set(f"{pnl_pct:.1f}%")
+                            
+                            # Update daily trades
+                            max_trades = self.bots[self.active_bot_id]['config'].get('max_daily_trades', 1000)
+                            trades_pct = (daily_trades / max_trades * 100) if max_trades > 0 else 0
+                            self.risk_vars['daily_trades'].set(str(daily_trades))
+                            self.risk_vars['trades_pct'].set(f"{trades_pct:.1f}%")
                             
                         except Exception as e:
                             # If MT5 not available, reset all
