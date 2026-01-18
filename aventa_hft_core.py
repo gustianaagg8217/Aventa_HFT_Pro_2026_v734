@@ -931,12 +931,33 @@ class UltraLowLatencyEngine:
                             f"Commission=${commission_per_trade:.2f}")
                     
                     if self.telegram_callback:
+                        # Get account info right after position close
+                        try:
+                            account_info = mt5.account_info()
+                            if account_info:
+                                balance = account_info.balance
+                                equity = account_info.equity
+                                free_margin = account_info.margin_free
+                                margin = account_info.margin
+                                margin_level = (equity / margin) * 100 if margin and margin > 0 else 0
+                                logger.info(f"Account info fetched for close: Balance={balance:.2f}, Equity={equity:.2f}, Free Margin={free_margin:.2f}, Margin Level={margin_level:.2f}%")
+                            else:
+                                logger.warning("MT5 account_info() returned None during position close")
+                                balance = equity = free_margin = margin_level = None
+                        except Exception as e:
+                            logger.error(f"Failed to get account info during position close: {e}")
+                            balance = equity = free_margin = margin_level = None
+
                         self.telegram_callback(
                             signal_type="close_position",
                             symbol=self.symbol,
                             ticket=position.ticket,
                             profit=position.profit,
-                            volume=position.volume
+                            volume=position.volume,
+                            balance=balance,
+                            equity=equity,
+                            free_margin=free_margin,
+                            margin_level=margin_level
                         )
             
             if closed_count > 0:
