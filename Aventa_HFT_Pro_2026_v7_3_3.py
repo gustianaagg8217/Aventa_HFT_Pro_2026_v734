@@ -1198,6 +1198,13 @@ class HFTProGUI:
                     self.limit_vars['max_position_size'].set(limits.get('max_position_size', '2'))
                     self.limit_vars['max_positions'].set(limits.get('max_positions', '20'))
                     self.limit_vars['max_drawdown_pct'].set(limits.get('max_drawdown_pct', '10'))
+                
+                # Telegram Configuration
+                if 'telegram' in config:
+                    telegram_config = config['telegram']
+                    self.telegram_token_var.set(telegram_config.get('token', ''))
+                    chat_ids = telegram_config.get('chat_ids', [])
+                    self.telegram_chat_ids_var.set(','.join(str(cid) for cid in chat_ids))
                         
             except Exception as e:
                 self.log_message(f"Apply config error: {e}", "ERROR")
@@ -1242,6 +1249,12 @@ class HFTProGUI:
                     'max_position_size': float(self.limit_vars['max_position_size'].get().strip()),
                     'max_positions': int(self.limit_vars['max_positions'].get().strip()),
                     'max_drawdown_pct': float(self.limit_vars['max_drawdown_pct'].get().strip()),
+                    
+                    # Telegram Configuration
+                    'telegram': {
+                        'token': self.telegram_token_var.get().strip(),
+                        'chat_ids': [cid.strip() for cid in self.telegram_chat_ids_var.get().split(',') if cid.strip()]
+                    }
                 }
                 return config
             except Exception as e:  
@@ -1665,6 +1678,9 @@ class HFTProGUI:
                 # Save to bot's config
                 self.bots[bot_id]['config'] = config
                 
+                # Update telegram bot if telegram config exists
+                self.update_telegram_bot_for_config(bot_id, config)
+                
                 # If bot is running, update its risk_manager live
                 if self.bots[bot_id]['is_running'] and self.bots[bot_id]['risk_manager']:
                     rm = self.bots[bot_id]['risk_manager']
@@ -1681,6 +1697,38 @@ class HFTProGUI:
                 
             except Exception as e: 
                 self.log_message(f"Save GUI config error: {e}", "ERROR")
+
+        def update_telegram_bot_for_config(self, bot_id, config):
+            """Update telegram bot for a bot's config"""
+            try:
+                if 'telegram' in config:
+                    telegram_config = config['telegram']
+                    token = telegram_config.get('token', '').strip()
+                    chat_ids = [str(cid).strip() for cid in telegram_config.get('chat_ids', []) if str(cid).strip()]
+                    
+                    if token and chat_ids:
+                        # Import TelegramBot if not already imported
+                        try:
+                            from telegram_bot import TelegramBot
+                        except ImportError:
+                            self.log_message("TelegramBot module not found", "WARNING")
+                            return
+                            
+                        self.telegram_bots[bot_id] = TelegramBot(token, chat_ids)
+                        self.log_message(f"✓ Telegram bot updated for {bot_id}", "INFO")
+                    else:
+                        # Remove telegram bot if config is incomplete
+                        if bot_id in self.telegram_bots:
+                            del self.telegram_bots[bot_id]
+                            self.log_message(f"✓ Telegram bot removed for {bot_id} (incomplete config)", "INFO")
+                else:
+                    # Remove telegram bot if no telegram config
+                    if bot_id in self.telegram_bots:
+                        del self.telegram_bots[bot_id]
+                        self.log_message(f"✓ Telegram bot removed for {bot_id} (no config)", "INFO")
+                        
+            except Exception as e:
+                self.log_message(f"Update telegram bot error for {bot_id}: {e}", "ERROR")
 
         def load_bot_config_to_gui(self, bot_id):
             """Load specific bot's config to GUI (COMPLETE VERSION)"""
@@ -3372,6 +3420,8 @@ This is a test message from Aventa HFT Pro 2026"""
                     message = self.format_open_position_signal(bot_id=bot_id, **kwargs)
                 elif signal_type == 'close_position':
                     message = self.format_close_position_signal(bot_id=bot_id, **kwargs)
+                elif signal_type == 'clear_all_positions':
+                    message = self.format_clear_all_positions_signal(bot_id=bot_id, **kwargs)
                 else:
                     return
 
@@ -3463,6 +3513,30 @@ This is a test message from Aventa HFT Pro 2026"""
 📊 Total Lot Today: {total_volume_str}
 
 🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
+
+        def format_clear_all_positions_signal(self, bot_id, closed_count, total_profit, balance=None, equity=None, free_margin=None, margin_level=None):
+            """Format clear all positions signal message"""
+            # Format account info with N/A fallback
+            balance_str = f"${balance:.2f}" if balance is not None else "N/A"
+            equity_str = f"${equity:.2f}" if equity is not None else "N/A"
+            free_margin_str = f"${free_margin:.2f}" if free_margin is not None else "N/A"
+            margin_level_str = f"{margin_level:.2f}%" if margin_level is not None else "N/A"
+
+            return f"""🧹 **CLEANSHEET - ALL POSITIONS CLEARED**
+
+🤖 Bot: {bot_id}
+✅ Positions Closed: {closed_count}
+💰 Total P&L: ${total_profit:.2f}
+
+💳 **Account Summary:**
+💵 Balance: {balance_str}
+📊 Equity: {equity_str}
+🆓 Free Margin: {free_margin_str}
+📊 Margin Level: {margin_level_str}
+
+🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+🎯 All positions successfully cleared!"""
 
         def build_ml_tab(self):
             """Build ML Models tab"""
@@ -4600,6 +4674,31 @@ This is a test message from Aventa HFT Pro 2026"""
                             free_margin=free_margin,
                             margin_level=margin_level
                         )
+                
+                # Send summary notification for clear all positions
+                if closed > 0:
+                    try:
+                        # Get updated account info after closing all positions
+                        account_info = mt5.account_info()
+                        if account_info:
+                            balance = account_info.balance
+                            equity = account_info.equity
+                            free_margin = account_info.margin_free
+                            margin = account_info.margin
+                            margin_level = (equity / margin) * 100 if margin and margin > 0 else 0
+                        
+                        self.send_telegram_signal(
+                            bot_id=self.active_bot_id,
+                            signal_type="clear_all_positions",
+                            closed_count=closed,
+                            total_profit=total_profit,
+                            balance=balance,
+                            equity=equity,
+                            free_margin=free_margin,
+                            margin_level=margin_level
+                        )
+                    except Exception as e:
+                        self.log_message(f"Failed to send clear all positions telegram: {e}", "ERROR")
                 
                 # Show summary
                 messagebox.showinfo(
