@@ -154,6 +154,15 @@ class StrategyBacktester:
             df = pd.DataFrame(rates)
             df['time'] = pd.to_datetime(df['time'], unit='s')
 
+            # ✅ FIX: MT5 returns 'tick_volume', rename to 'volume'
+            if 'tick_volume' in df.columns and 'volume' not in df.columns:
+                df['volume'] = df['tick_volume']
+            
+            # Ensure volume column exists
+            if 'volume' not in df.columns:
+                logger.warning("Volume column not found, creating dummy volume")
+                df['volume'] = 1  # Fallback: use dummy volume
+
             # ✅ DATA QUALITY CHECKS
             if df.isnull().any().any():
                 raise Exception("Historical data contains null values")
@@ -241,10 +250,14 @@ class StrategyBacktester:
         """Calculate technical indicators with validation"""
         try:
             # ✅ VALIDATE INPUT DATA
-            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            required_columns = ['open', 'high', 'low', 'close']
             for col in required_columns:
                 if col not in df.columns:
                     raise ValueError(f"Missing required column: {col}")
+            
+            # Ensure volume column exists (may come from tick_volume or be dummy)
+            if 'volume' not in df.columns:
+                df['volume'] = 1  # Fallback volume if not present
 
             # EMA
             ema_fast = self.config.get('ema_fast_period', 7)

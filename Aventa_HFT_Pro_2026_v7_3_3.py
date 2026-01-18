@@ -2425,7 +2425,7 @@ class HFTProGUI:
                         command=self.export_backtest_results, width=18).pack(side=tk.LEFT, padx=5)
                 
                 ttk.Button(control_row, text="📁 Export Trades CSV", 
-                        command=self.export_trades_csv, width=18).pack(side=tk.LEFT, padx=5)
+                        command=self.export_trades_csv, width=18).pack(side=tk.LEFT, padx=7)
 
                 # Progress Bar
                 progress_frame = ttk.Frame(config_frame)
