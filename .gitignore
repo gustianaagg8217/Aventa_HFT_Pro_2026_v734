@@ -21,4 +21,4 @@ PT NSM/
 *.log
 *.json
 models/
-
+.xml

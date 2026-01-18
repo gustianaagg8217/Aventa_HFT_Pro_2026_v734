@@ -3,6 +3,7 @@ import time
 from config_manager import ConfigManager
 from thread_safety import ThreadSafeGUI, ThreadSafeCallback
 from trade_database import TradeDatabase
+from telegram_bot import TelegramBot
 
 def anti_debug():
     try:
@@ -55,6 +56,7 @@ TRANSLATIONS = {
         'tab_ml': '🤖 ML Models',
         'tab_strategy': '🧪 Strategy Tester',
         'tab_logs': '📝 Logs',
+        'tab_telegram': '📱 Telegram Service',
         'status_ready': 'Status: Ready',
         'status_trading': 'Status:  TRADING ACTIVE',
         'status_stopped': 'Status:  Stopped',
@@ -67,6 +69,7 @@ TRANSLATIONS = {
         'tab_ml': '🤖 Model ML',
         'tab_strategy':  '🧪 Penguji Strategi',
         'tab_logs': '📝 Log',
+        'tab_telegram': '📱 Layanan Telegram',
         'status_ready':  'Status:  Siap',
         'status_trading': 'Status: TRADING AKTIF',
         'status_stopped': 'Status: Dihentikan',
@@ -423,25 +426,10 @@ class HFTProGUI:
                 'max_drawdown_pct': tk.StringVar(value="10")
             }
             
-            # Performance metrics variables
-            self.perf_vars = {
-                'trades_today': tk.StringVar(value="0"),
-                'wins': tk.StringVar(value="0"),
-                'losses': tk.StringVar(value="0"),
-                'win_rate': tk.StringVar(value="0.0%"),
-                'daily_pnl': tk.StringVar(value="$0.00"),
-                'signals':  tk.StringVar(value="0"),
-                'position':  tk.StringVar(value="None"),
-                'position_vol': tk.StringVar(value="0.00"),
-                'balance': tk.StringVar(value="$0.00"),
-                'equity': tk.StringVar(value="$0.00"),
-                'floating':  tk.StringVar(value="$0.00"),
-                'latency_avg': tk.StringVar(value="0.0 μs"),
-                'latency_max': tk.StringVar(value="0.0 μs"),
-                'exec_avg': tk.StringVar(value="0.00 ms"),
-                'exec_max':  tk.StringVar(value="0.00 ms"),
-                'ticks':  tk.StringVar(value="0"),
-            }
+            # Telegram Configuration
+            self.telegram_token_var = tk.StringVar(value="")
+            self.telegram_chat_ids_var = tk.StringVar(value="")
+            self.telegram_bots = {}  # Dictionary to store telegram bots per bot_id
 
 
         def t(self, key):
@@ -594,6 +582,7 @@ class HFTProGUI:
             self.ml_tab = ttk.Frame(self.notebook)
             self.strategy_tab = ttk.Frame(self.notebook)
             self.log_tab = ttk.Frame(self.notebook)
+            self.telegram_tab = ttk.Frame(self.notebook)
 
             self.notebook.add(self.control_tab, text=self.t('tab_control'))
             self.notebook.add(self.performance_tab, text=self.t('tab_performance'))
@@ -601,6 +590,7 @@ class HFTProGUI:
             self.notebook.add(self.ml_tab, text=self.t('tab_ml'))
             self.notebook.add(self.strategy_tab, text=self.t('tab_strategy'))
             self.notebook.add(self.log_tab, text=self.t('tab_logs'))
+            self.notebook.add(self.telegram_tab, text=self.t('tab_telegram'))
 
             # Add this binding before building tabs
             self.notebook.bind('<<NotebookTabChanged>>', self.on_tab_changed)
@@ -612,6 +602,7 @@ class HFTProGUI:
             self.build_risk_tab()
             self.build_ml_tab()
             self.build_strategy_tab()
+            self.build_telegram_tab()
 
             # Status bar
             self.status_bar = ttk.Label(main_content, text=self.t('status_ready'), relief=tk.SUNKEN, anchor=tk.W,
@@ -2900,6 +2891,356 @@ class HFTProGUI:
                 tb = traceback.format_exc()
                 print(tb)
                 messagebox.showerror("Error", f"{error_msg}\n\nCheck console for details.")
+
+        def build_telegram_tab(self):
+            """Build Telegram Service Signal tab"""
+            try:
+                # Create scrollable frame
+                canvas = tk.Canvas(self.telegram_tab, bg='#0a0e27', highlightthickness=0)
+                scrollbar = ttk.Scrollbar(self.telegram_tab, orient="vertical", command=canvas.yview)
+                scrollable_frame = ttk.Frame(canvas)
+
+                scrollable_frame.bind(
+                    "<Configure>",
+                    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+                )
+
+                canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+                canvas.configure(yscrollcommand=scrollbar.set)
+
+                canvas.pack(side="left", fill="both", expand=True)
+                scrollbar.pack(side="right", fill="y")
+
+                # Title
+                title_label = ttk.Label(scrollable_frame, text="📱 Telegram Service Signal",
+                                      font=('Segoe UI', 16, 'bold'), foreground='#00e676',
+                                      background='#0a0e27')
+                title_label.pack(pady=(10, 20))
+
+                # Bot Selection Frame
+                bot_frame = ttk.LabelFrame(scrollable_frame, text="🤖 Bot Selection", padding=10)
+                bot_frame.pack(fill=tk.X, padx=10, pady=5)
+
+                ttk.Label(bot_frame, text="Select Bot:", font=('Segoe UI', 10)).pack(side=tk.LEFT, padx=5)
+                self.telegram_bot_selector = ttk.Combobox(bot_frame, values=list(self.bots.keys()),
+                                                        state='readonly', width=20)
+                self.telegram_bot_selector.pack(side=tk.LEFT, padx=5)
+                self.telegram_bot_selector.bind('<<ComboboxSelected>>', self.on_telegram_bot_selected)
+
+                # Telegram Configuration Frame
+                config_frame = ttk.LabelFrame(scrollable_frame, text="⚙️ Telegram Configuration", padding=10)
+                config_frame.pack(fill=tk.X, padx=10, pady=5)
+
+                # Token input
+                token_frame = ttk.Frame(config_frame)
+                token_frame.pack(fill=tk.X, pady=5)
+                ttk.Label(token_frame, text="Bot Token:", width=15, font=('Segoe UI', 10)).pack(side=tk.LEFT)
+                self.telegram_token_entry = ttk.Entry(token_frame, textvariable=self.telegram_token_var, width=50)
+                self.telegram_token_entry.pack(side=tk.LEFT, padx=5)
+
+                # Chat IDs input
+                chat_frame = ttk.Frame(config_frame)
+                chat_frame.pack(fill=tk.X, pady=5)
+                ttk.Label(chat_frame, text="Chat IDs (comma separated):", width=25, font=('Segoe UI', 10)).pack(side=tk.LEFT)
+                self.telegram_chat_ids_entry = ttk.Entry(chat_frame, textvariable=self.telegram_chat_ids_var, width=40)
+                self.telegram_chat_ids_entry.pack(side=tk.LEFT, padx=5)
+
+                # Buttons Frame
+                buttons_frame = ttk.Frame(config_frame)
+                buttons_frame.pack(fill=tk.X, pady=10)
+
+                self.test_token_btn = ttk.Button(buttons_frame, text="🔗 Test Token Connection",
+                                               command=self.test_telegram_token, width=20)
+                self.test_token_btn.pack(side=tk.LEFT, padx=5)
+
+                self.test_signal_btn = ttk.Button(buttons_frame, text="📤 Test Signal",
+                                                command=self.test_telegram_signal, width=15)
+                self.test_signal_btn.pack(side=tk.LEFT, padx=5)
+
+                self.save_telegram_config_btn = ttk.Button(buttons_frame, text="💾 Save Configuration",
+                                                         command=self.save_telegram_config, width=20)
+                self.save_telegram_config_btn.pack(side=tk.LEFT, padx=5)
+
+                # Status Frame
+                status_frame = ttk.LabelFrame(scrollable_frame, text="📊 Status", padding=10)
+                status_frame.pack(fill=tk.X, padx=10, pady=5)
+
+                self.telegram_status_text = tk.Text(status_frame, height=8, width=80, bg='#1a1e3a',
+                                                  fg='#e0e0e0', font=('Courier', 9))
+                self.telegram_status_text.pack(fill=tk.BOTH, expand=True)
+
+                # Signal Format Info
+                info_frame = ttk.LabelFrame(scrollable_frame, text="ℹ️ Signal Format Information", padding=10)
+                info_frame.pack(fill=tk.X, padx=10, pady=5)
+
+                info_text = """
+🔵 OPEN POSITION Signal Format:
+• Timestamp: [Date/Time]
+• Open Entry: [Price]
+• Margin Level: [Percentage]%
+• Balance: $[Amount]
+• Equity: $[Amount]
+• Free Margin: $[Amount]
+
+🔴 CLOSE POSITION Signal Format:
+• Timestamp: [Date/Time]
+• Close Entry: [Price]
+• Margin Level: [Percentage]%
+• Balance: $[Amount]
+• Equity: $[Amount]
+• Free Margin: $[Amount]
+• Total Lot Today: [Volume]
+                """
+                info_label = ttk.Label(info_frame, text=info_text, font=('Segoe UI', 9),
+                                     justify=tk.LEFT, background='#1a1e3a', foreground='#e0e0e0')
+                info_label.pack(fill=tk.X)
+
+                # Initial status
+                self.update_telegram_status("Ready - Select a bot and configure Telegram settings")
+
+            except Exception as e:
+                self.log_message(f"Build telegram tab error: {e}", "ERROR")
+                import traceback
+                traceback.print_exc()
+
+        def on_telegram_bot_selected(self, event=None):
+            """Handle bot selection for telegram configuration"""
+            try:
+                selected_bot = self.telegram_bot_selector.get()
+                if selected_bot and selected_bot in self.bots:
+                    # Load existing telegram config for this bot
+                    config = self.config_manager.load_config(selected_bot)
+                    telegram_config = config.get('telegram', {})
+
+                    self.telegram_token_var.set(telegram_config.get('token', ''))
+                    self.telegram_chat_ids_var.set(','.join(telegram_config.get('chat_ids', [])))
+
+                    self.update_telegram_status(f"Loaded configuration for bot: {selected_bot}")
+                else:
+                    self.telegram_token_var.set('')
+                    self.telegram_chat_ids_var.set('')
+                    self.update_telegram_status("No bot selected")
+            except Exception as e:
+                self.log_message(f"Bot selection error: {e}", "ERROR")
+
+        def test_telegram_token(self):
+            """Test Telegram bot token connection"""
+            try:
+                token = self.telegram_token_var.get().strip()
+                if not token:
+                    messagebox.showerror("Error", "Please enter a bot token first!")
+                    return
+
+                self.update_telegram_status("Testing token connection...")
+
+                # Create temporary bot to test token
+                import asyncio
+                from telegram import Bot
+
+                async def test_token():
+                    try:
+                        bot = Bot(token=token)
+                        bot_info = await bot.get_me()
+                        self.update_telegram_status(f"✅ Token valid!\nBot: @{bot_info.username}\nName: {bot_info.first_name}")
+                        messagebox.showinfo("Success", f"Token connection successful!\n\nBot: @{bot_info.username}")
+                    except Exception as e:
+                        error_msg = f"❌ Token invalid: {str(e)}"
+                        self.update_telegram_status(error_msg)
+                        messagebox.showerror("Error", error_msg)
+
+                # Run async test
+                asyncio.run(test_token())
+
+            except Exception as e:
+                error_msg = f"Test failed: {str(e)}"
+                self.update_telegram_status(error_msg)
+                messagebox.showerror("Error", error_msg)
+
+        def test_telegram_signal(self):
+            """Test sending signal to configured chat IDs"""
+            try:
+                token = self.telegram_token_var.get().strip()
+                chat_ids_str = self.telegram_chat_ids_var.get().strip()
+
+                if not token:
+                    messagebox.showerror("Error", "Please enter a bot token first!")
+                    return
+
+                if not chat_ids_str:
+                    messagebox.showerror("Error", "Please enter chat IDs first!")
+                    return
+
+                chat_ids = [id.strip() for id in chat_ids_str.split(',') if id.strip()]
+
+                if not chat_ids:
+                    messagebox.showerror("Error", "No valid chat IDs found!")
+                    return
+
+                self.update_telegram_status("Sending test signal...")
+
+                # Create test signal message
+                test_message = f"""🧪 TEST SIGNAL
+
+🤖 Bot: {self.telegram_bot_selector.get() or 'Unknown'}
+🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+This is a test message from Aventa HFT Pro 2026"""
+
+                import asyncio
+                from telegram import Bot
+
+                async def send_test():
+                    try:
+                        bot = Bot(token=token)
+                        success_count = 0
+
+                        for chat_id in chat_ids:
+                            try:
+                                await bot.send_message(chat_id=chat_id, text=test_message)
+                                success_count += 1
+                            except Exception as e:
+                                self.update_telegram_status(f"Failed to send to {chat_id}: {str(e)}")
+
+                        if success_count > 0:
+                            self.update_telegram_status(f"✅ Test signal sent successfully to {success_count}/{len(chat_ids)} chat(s)")
+                            messagebox.showinfo("Success", f"Test signal sent to {success_count} chat(s)!")
+                        else:
+                            self.update_telegram_status("❌ Failed to send to any chats")
+                            messagebox.showerror("Error", "Failed to send to any chats")
+
+                    except Exception as e:
+                        error_msg = f"❌ Send failed: {str(e)}"
+                        self.update_telegram_status(error_msg)
+                        messagebox.showerror("Error", error_msg)
+
+                # Run async send
+                asyncio.run(send_test())
+
+            except Exception as e:
+                error_msg = f"Test signal failed: {str(e)}"
+                self.update_telegram_status(error_msg)
+                messagebox.showerror("Error", error_msg)
+
+        def save_telegram_config(self):
+            """Save Telegram configuration for selected bot"""
+            try:
+                selected_bot = self.telegram_bot_selector.get()
+                if not selected_bot or selected_bot not in self.bots:
+                    messagebox.showerror("Error", "Please select a bot first!")
+                    return
+
+                token = self.telegram_token_var.get().strip()
+                chat_ids_str = self.telegram_chat_ids_var.get().strip()
+
+                if not token:
+                    messagebox.showerror("Error", "Please enter a bot token!")
+                    return
+
+                if not chat_ids_str:
+                    messagebox.showerror("Error", "Please enter chat IDs!")
+                    return
+
+                chat_ids = [id.strip() for id in chat_ids_str.split(',') if id.strip()]
+
+                # Load existing config
+                config = self.config_manager.load_config(selected_bot)
+
+                # Update telegram config
+                config['telegram'] = {
+                    'token': token,
+                    'chat_ids': chat_ids
+                }
+
+                # Save config
+                self.config_manager.save_config(selected_bot, config)
+
+                # Create or update telegram bot instance
+                if selected_bot not in self.telegram_bots:
+                    self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+                else:
+                    # Update existing bot
+                    self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+
+                self.update_telegram_status(f"✅ Configuration saved for bot: {selected_bot}")
+                messagebox.showinfo("Success", f"Telegram configuration saved for {selected_bot}!")
+
+            except Exception as e:
+                error_msg = f"Save failed: {str(e)}"
+                self.update_telegram_status(error_msg)
+                messagebox.showerror("Error", error_msg)
+
+        def update_telegram_status(self, message):
+            """Update telegram status display"""
+            try:
+                if hasattr(self, 'telegram_status_text'):
+                    self.telegram_status_text.delete(1.0, tk.END)
+                    self.telegram_status_text.insert(tk.END, message)
+            except Exception as e:
+                pass
+
+        def send_telegram_signal(self, bot_id, signal_type, **kwargs):
+            """Send trading signal to Telegram"""
+            try:
+                if bot_id not in self.telegram_bots:
+                    return
+
+                bot = self.telegram_bots[bot_id]
+                chat_ids = bot.allowed_users
+
+                if signal_type == 'open_position':
+                    message = self.format_open_position_signal(**kwargs)
+                elif signal_type == 'close_position':
+                    message = self.format_close_position_signal(**kwargs)
+                else:
+                    return
+
+                import asyncio
+
+                async def send_signal():
+                    try:
+                        telegram_bot = Bot(token=bot.token)
+                        for chat_id in chat_ids:
+                            try:
+                                await telegram_bot.send_message(chat_id=chat_id, text=message)
+                            except Exception as e:
+                                self.log_message(f"Failed to send Telegram signal to {chat_id}: {e}", "ERROR")
+                    except Exception as e:
+                        self.log_message(f"Telegram signal error: {e}", "ERROR")
+
+                # Run in background
+                asyncio.create_task(send_signal())
+
+            except Exception as e:
+                self.log_message(f"Send telegram signal error: {e}", "ERROR")
+
+        def format_open_position_signal(self, timestamp, open_entry, margin_level, balance, equity, free_margin):
+            """Format open position signal message"""
+            return f"""🔵 OPEN POSITION SIGNAL
+
+🤖 Bot: {self.active_bot_id or 'Unknown'}
+🕐 Timestamp: {timestamp}
+💰 Open Entry: ${open_entry:.5f}
+📊 Margin Level: {margin_level:.2f}%
+💵 Balance: ${balance:.2f}
+📈 Equity: ${equity:.2f}
+🆓 Free Margin: ${free_margin:.2f}
+
+🚀 Position opened successfully!"""
+
+        def format_close_position_signal(self, timestamp, close_entry, margin_level, balance, equity, free_margin, total_lot_today):
+            """Format close position signal message"""
+            return f"""🔴 CLOSE POSITION SIGNAL
+
+🤖 Bot: {self.active_bot_id or 'Unknown'}
+🕐 Timestamp: {timestamp}
+💰 Close Entry: ${close_entry:.5f}
+📊 Margin Level: {margin_level:.2f}%
+💵 Balance: ${balance:.2f}
+📈 Equity: ${equity:.2f}
+🆓 Free Margin: ${free_margin:.2f}
+📦 Total Lot Today: {total_lot_today:.2f}
+
+✅ Position closed successfully!"""
 
         def build_ml_tab(self):
             """Build ML Models tab"""
