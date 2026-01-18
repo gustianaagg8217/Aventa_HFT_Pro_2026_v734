@@ -1258,9 +1258,12 @@ class UltraLowLatencyEngine:
                             free_margin = account_info.margin_free
                             margin = account_info.margin
                             margin_level = (equity / margin) * 100 if margin and margin > 0 else 0
+                            logger.info(f"Account info fetched for close: Balance={balance:.2f}, Equity={equity:.2f}, Free Margin={free_margin:.2f}, Margin Level={margin_level:.2f}%")
                         else:
+                            logger.warning("MT5 account_info() returned None during position close")
                             balance = equity = free_margin = margin_level = None
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Failed to get account info during position close: {e}")
                         balance = equity = free_margin = margin_level = None
 
                     self.telegram_callback(

@@ -4450,7 +4450,12 @@ This is a test message from Aventa HFT Pro 2026"""
                 if not self.active_bot_id or self.active_bot_id not in self.bots:
                     messagebox.showwarning("Warning", "Please select a bot first!")
                     return
-                
+
+                # Initialize MT5 if not already initialized
+                if not mt5.initialize():
+                    messagebox.showerror("Error", "Failed to initialize MT5 connection!")
+                    return
+
                 bot = self.bots[self.active_bot_id]
                 magic = bot['config'].get('magic_number', 2026002)
                 
@@ -4518,9 +4523,12 @@ This is a test message from Aventa HFT Pro 2026"""
                                     free_margin = account_info.margin_free
                                     margin = account_info.margin
                                     margin_level = (equity / margin) * 100 if margin and margin > 0 else 0
+                                    self.log_message(f"Account info fetched: Balance={balance:.2f}, Equity={equity:.2f}, Free Margin={free_margin:.2f}, Margin Level={margin_level:.2f}%", "INFO")
                                 else:
+                                    self.log_message("MT5 account_info() returned None", "WARNING")
                                     balance = equity = free_margin = margin_level = None
-                            except Exception:
+                            except Exception as e:
+                                self.log_message(f"Failed to get account info: {e}", "ERROR")
                                 balance = equity = free_margin = margin_level = None
 
                             bot['engine'].telegram_callback(
