@@ -1126,4 +1126,31 @@ Use buttons below for quick access 👇"""
 /save\_config <name> - Save current as preset
 
 *General:*
-"""
+/help - Show this help
+        """
+        await update.message.reply_text(help_msg, parse_mode='Markdown')
+
+    async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle button callbacks"""
+        query = update.callback_query
+        await query.answer()
+        
+        data = query.data
+        
+        if not self.is_authorized(query.from_user.id):
+            await query.edit_message_text("❌ Unauthorized")
+            return
+        
+        # Handle different button actions
+        if data.startswith('edit_'):
+            await query.edit_message_text("⚙️ Edit functionality not implemented yet")
+        elif data == 'back_to_main':
+            await query.edit_message_text("🏠 Back to main menu")
+        elif data == 'confirm_start':
+            await query.edit_message_text("▶️ Starting trading...")
+        elif data == 'confirm_stop':
+            await query.edit_message_text("⏹️ Stopping trading...")
+        elif data == 'confirm_close_all':
+            await query.edit_message_text("🔒 Closing all positions...")
+        else:
+            await query.edit_message_text("❓ Unknown action")

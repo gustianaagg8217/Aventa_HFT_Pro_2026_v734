@@ -929,6 +929,15 @@ class UltraLowLatencyEngine:
                     logger.info(f"✓ Posisi #{position.ticket} berhasil ditutup: "
                             f"Profit=${position.profit:.2f} | "
                             f"Commission=${commission_per_trade:.2f}")
+                    
+                    if self.telegram_callback:
+                        self.telegram_callback(
+                            signal_type="close_position",
+                            symbol=self.symbol,
+                            ticket=position.ticket,
+                            profit=position.profit,
+                            volume=position.volume
+                        )
             
             if closed_count > 0:
                 # ✅ Hitung net profit (setelah komisi)
@@ -1146,24 +1155,15 @@ class UltraLowLatencyEngine:
                 
                 # Send Telegram signal for open position
                 if self.telegram_callback:
-                    try:
-                        account_info = mt5.account_info()
-                        if account_info:
-                            margin_level = (account_info.equity / account_info.margin) * 100 if account_info.margin > 0 else 0
-                            free_margin = account_info.margin_free
-                            
-                            self.telegram_callback(
-                                bot_id=self.config.get('bot_id', 'unknown'),
-                                signal_type='open_position',
-                                timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                open_entry=result.price,
-                                margin_level=margin_level,
-                                balance=account_info.balance,
-                                equity=account_info.equity,
-                                free_margin=free_margin
-                            )
-                    except Exception as e:
-                        logger.error(f"Telegram open signal error: {e}")
+                    self.telegram_callback(
+                        signal_type="open_position",
+                        symbol=self.symbol,
+                        order_type=order_type,
+                        volume=signal.volume,
+                        price=signal.price,
+                        sl=signal.stop_loss,
+                        tp=signal.take_profit
+                    )
                 
                 return True
             else:
@@ -1258,7 +1258,6 @@ class UltraLowLatencyEngine:
                             total_lot_today = self.get_today_total_volume()
                             
                             self.telegram_callback(
-                                bot_id=self.config.get('bot_id', 'unknown'),
                                 signal_type='close_position',
                                 timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 close_entry=position.price_current,

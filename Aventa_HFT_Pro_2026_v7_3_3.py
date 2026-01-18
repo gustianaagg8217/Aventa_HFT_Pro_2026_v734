@@ -1305,7 +1305,7 @@ class HFTProGUI:
                     self.log_message(f"{self.active_bot_id}:  ML Predictor enabled", "INFO")
                 
                 bot['engine'] = UltraLowLatencyEngine(config['symbol'], config, bot['risk_manager'], ml_predictor, 
-                                                telegram_callback=lambda **kwargs: self.send_telegram_signal(self.active_bot_id, **kwargs))
+                                                telegram_callback=lambda **data: self.send_telegram_signal(bot_id=self.active_bot_id, **data))
                 
                 # Initialize and start
                 if bot['engine'].initialize():
@@ -3051,6 +3051,15 @@ class HFTProGUI:
                     self.telegram_token_var.set(telegram_config.get('token', ''))
                     self.telegram_chat_ids_var.set(','.join(telegram_config.get('chat_ids', [])))
 
+                    # Create TelegramBot instance if config exists
+                    token = telegram_config.get('token', '')
+                    chat_ids = telegram_config.get('chat_ids', [])
+                    if token and chat_ids:
+                        if selected_bot not in self.telegram_bots:
+                            self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+                        else:
+                            self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+
                     self.update_telegram_status(f"Loaded configuration for bot: {selected_bot}")
                 else:
                     self.telegram_token_var.set('')
@@ -3179,7 +3188,7 @@ This is a test message from Aventa HFT Pro 2026"""
                 chat_ids = [id.strip() for id in chat_ids_str.split(',') if id.strip()]
 
                 # Load existing config
-                config = self.config_manager.load_config(selected_bot)
+                config = self.config_manager.load_config(f"{selected_bot.replace(' ', '_')}_config.json")
                 if config is None:
                     config = {}
 
@@ -3190,7 +3199,7 @@ This is a test message from Aventa HFT Pro 2026"""
                 }
 
                 # Save config
-                self.config_manager.save_config(selected_bot, config)
+                self.config_manager.save_config(config, bot_id=selected_bot)
 
                 # Create or update telegram bot instance
                 if selected_bot not in self.telegram_bots:
@@ -3198,6 +3207,13 @@ This is a test message from Aventa HFT Pro 2026"""
                 else:
                     # Update existing bot
                     self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+
+                # Update bot's config in memory
+                if selected_bot in self.bots:
+                    self.bots[selected_bot]['config']['telegram'] = {
+                        'token': token,
+                        'chat_ids': chat_ids
+                    }
 
                 self.update_telegram_status(f"✅ Configuration saved for bot: {selected_bot}")
                 messagebox.showinfo("Success", f"Telegram configuration saved for {selected_bot}!")
@@ -3208,48 +3224,45 @@ This is a test message from Aventa HFT Pro 2026"""
                 messagebox.showerror("Error", error_msg)
 
         def load_telegram_config(self):
-            """Load Telegram configuration from file for selected bot"""
+            """Load Telegram configuration from bot's saved config"""
             try:
                 selected_bot = self.telegram_bot_selector.get()
                 if not selected_bot or selected_bot not in self.bots:
                     messagebox.showerror("Error", "Please select a bot first!")
                     return
 
-                filename = filedialog.askopenfilename(
-                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-                    title=f"Load Telegram Config for {selected_bot}"
-                )
-                if filename:
-                    with open(filename, 'r') as f:
-                        loaded_config = json.load(f)
-                    
-                    # Extract telegram config
-                    telegram_config = loaded_config.get('telegram', {})
-                    if not telegram_config:
-                        messagebox.showwarning("Warning", "No Telegram configuration found in file!")
-                        return
+                # Load from bot's config file
+                bot_config = self.config_manager.load_config(f"{selected_bot.replace(' ', '_')}_config.json")
+                
+                if bot_config and 'telegram' in bot_config:
+                    telegram_config = bot_config['telegram']
                     
                     # Update GUI variables
                     self.telegram_token_var.set(telegram_config.get('token', ''))
-                    self.telegram_chat_ids_var.set(','.join(telegram_config.get('chat_ids', [])))
                     
-                    # Update bot's config
-                    bot_config = self.config_manager.load_config(selected_bot)
-                    if bot_config is None:
-                        bot_config = {}
-                    bot_config['telegram'] = telegram_config
-                    self.config_manager.save_config(selected_bot, bot_config)
+                    chat_ids = telegram_config.get('chat_ids', [])
+                    if isinstance(chat_ids, list):
+                        self.telegram_chat_ids_var.set(','.join(chat_ids))
+                    else:
+                        self.telegram_chat_ids_var.set(str(chat_ids))
                     
-                    # Update telegram bot instance
+                    # Update bot's config in memory
+                    if selected_bot in self.bots:
+                        self.bots[selected_bot]['config']['telegram'] = telegram_config
+                    
+                    # Create TelegramBot instance if config exists
                     token = telegram_config.get('token', '')
                     chat_ids = telegram_config.get('chat_ids', [])
-                    if selected_bot not in self.telegram_bots:
-                        self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
-                    else:
-                        self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+                    if token and chat_ids:
+                        if selected_bot not in self.telegram_bots:
+                            self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+                        else:
+                            self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
                     
                     self.update_telegram_status(f"✅ Configuration loaded for bot: {selected_bot}")
                     messagebox.showinfo("Success", f"Telegram configuration loaded for {selected_bot}!")
+                else:
+                    messagebox.showwarning("Warning", "No Telegram configuration found for this bot!")
 
             except Exception as e:
                 error_msg = f"Load failed: {str(e)}"
@@ -3302,20 +3315,23 @@ This is a test message from Aventa HFT Pro 2026"""
         def send_telegram_signal(self, bot_id, signal_type, **kwargs):
             """Send trading signal to Telegram"""
             try:
+                self.log_message(f"Sending telegram signal for bot {bot_id}: {signal_type}", "INFO")
                 if bot_id not in self.telegram_bots:
+                    self.log_message(f"No telegram config found for bot {bot_id}", "WARNING")
                     return
 
                 bot = self.telegram_bots[bot_id]
                 chat_ids = bot.allowed_users
 
                 if signal_type == 'open_position':
-                    message = self.format_open_position_signal(**kwargs)
+                    message = self.format_open_position_signal(bot_id=bot_id, **kwargs)
                 elif signal_type == 'close_position':
-                    message = self.format_close_position_signal(**kwargs)
+                    message = self.format_close_position_signal(bot_id=bot_id, **kwargs)
                 else:
                     return
 
                 import asyncio
+                from telegram import Bot
 
                 async def send_signal():
                     try:
@@ -3323,6 +3339,7 @@ This is a test message from Aventa HFT Pro 2026"""
                         for chat_id in chat_ids:
                             try:
                                 await telegram_bot.send_message(chat_id=chat_id, text=message)
+                                self.log_message(f"Telegram signal sent to {chat_id} for bot {bot_id}: {signal_type}", "INFO")
                             except Exception as e:
                                 self.log_message(f"Failed to send Telegram signal to {chat_id}: {e}", "ERROR")
                     except Exception as e:
@@ -3330,36 +3347,40 @@ This is a test message from Aventa HFT Pro 2026"""
 
                 # Run in background
                 asyncio.create_task(send_signal())
+                
+                # Update status
+                self.update_telegram_status(f"✅ {signal_type.upper()} signal sent to Telegram for bot: {bot_id}")
 
             except Exception as e:
-                self.log_message(f"Send telegram signal error: {e}", "ERROR")
+                error_msg = f"Send telegram signal error: {e}"
+                self.update_telegram_status(error_msg)
+                self.log_message(error_msg, "ERROR")
 
-        def format_open_position_signal(self, timestamp, open_entry, margin_level, balance, equity, free_margin):
+        def format_open_position_signal(self, bot_id, symbol, order_type, volume, price, sl, tp):
             """Format open position signal message"""
             return f"""🔵 OPEN POSITION SIGNAL
 
-🤖 Bot: {self.active_bot_id or 'Unknown'}
-🕐 Timestamp: {timestamp}
-💰 Open Entry: ${open_entry:.5f}
-📊 Margin Level: {margin_level:.2f}%
-💵 Balance: ${balance:.2f}
-📈 Equity: ${equity:.2f}
-🆓 Free Margin: ${free_margin:.2f}
+🤖 Bot: {bot_id}
+📊 Symbol: {symbol}
+📈 Order Type: {order_type}
+📦 Volume: {volume:.2f}
+💰 Price: ${price:.5f}
+🛡️ Stop Loss: ${sl:.5f}
+🎯 Take Profit: ${tp:.5f}
+🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 🚀 Position opened successfully!"""
 
-        def format_close_position_signal(self, timestamp, close_entry, margin_level, balance, equity, free_margin, total_lot_today):
+        def format_close_position_signal(self, bot_id, symbol, ticket, profit, volume):
             """Format close position signal message"""
             return f"""🔴 CLOSE POSITION SIGNAL
 
-🤖 Bot: {self.active_bot_id or 'Unknown'}
-🕐 Timestamp: {timestamp}
-💰 Close Entry: ${close_entry:.5f}
-📊 Margin Level: {margin_level:.2f}%
-💵 Balance: ${balance:.2f}
-📈 Equity: ${equity:.2f}
-🆓 Free Margin: ${free_margin:.2f}
-📦 Total Lot Today: {total_lot_today:.2f}
+🤖 Bot: {bot_id}
+📊 Symbol: {symbol}
+🎫 Ticket: {ticket}
+💰 Profit: ${profit:.2f}
+📦 Volume: {volume:.2f}
+🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ✅ Position closed successfully!"""
 
