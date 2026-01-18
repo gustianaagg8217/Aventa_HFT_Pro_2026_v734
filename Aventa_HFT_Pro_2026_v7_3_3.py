@@ -2096,6 +2096,21 @@ class HFTProGUI:
         def update_risk_metrics(self):
             """Update risk metrics display (called every 1 second)"""
             try:
+                # Ensure MT5 is initialized
+                mt5_path = None
+                if self.active_bot_id and self.active_bot_id in self.bots:
+                    mt5_path = self.bots[self.active_bot_id]['config'].get('mt5_path')
+                
+                if mt5_path:
+                    if not mt5.initialize(mt5_path):
+                        self.reset_risk_display()
+                        self.root.after(1000, self.update_risk_metrics)
+                        return
+                else:
+                    if not mt5.initialize():
+                        self.reset_risk_display()
+                        self.root.after(1000, self.update_risk_metrics)
+                        return
                 # Check if active bot is running
                 if self.active_bot_id and self.active_bot_id in self.bots:
                     bot = self.bots[self.active_bot_id]
@@ -2113,9 +2128,22 @@ class HFTProGUI:
                         # Get risk metrics from active bot's risk manager
                         metrics = bot['risk_manager'].get_risk_metrics(balance)
 
+                        # Calculate current exposure and position count from MT5 positions
+                        try:
+                            positions = mt5.positions_get()
+                            if positions:
+                                current_exposure = sum(abs(p.volume * p.price_open) for p in positions)
+                                position_count = len(positions)
+                            else:
+                                current_exposure = 0.0
+                                position_count = 0
+                        except Exception as e:
+                            current_exposure = 0.0
+                            position_count = 0
+
                         # Update displays
-                        self.risk_vars['current_exposure'].set(f"${metrics.current_exposure:.2f}")
-                        self.risk_vars['position_count'].set(str(metrics.position_count))
+                        self.risk_vars['current_exposure'].set(f"${current_exposure:.2f}")
+                        self.risk_vars['position_count'].set(str(position_count))
                         self.risk_vars['daily_pnl'].set(f"${metrics.daily_pnl:.2f}")
                         
                         # Calculate percentages
@@ -2136,12 +2164,87 @@ class HFTProGUI:
                         if metrics.risk_level == 'CRITICAL' and not bot['risk_manager'].circuit_breaker_triggered:
                             self.add_risk_event(f"⚠️ {self.active_bot_id} CRITICAL RISK - P&L: ${metrics.daily_pnl:.2f}", "CRITICAL")
                     else:
-                        # Bot not running - reset displays
-                        self.reset_risk_display()
+                        # Bot not running - show basic metrics from MT5
+                        try:
+                            account = mt5.account_info()
+                            if account:
+                                balance = account.balance
+                                equity = account.equity
+                                
+                                # Calculate drawdown
+                                if balance > 0:
+                                    drawdown = ((balance - equity) / balance) * 100
+                                else:
+                                    drawdown = 0.0
+                                
+                                self.risk_vars['drawdown'].set(f"{drawdown:.2f}%")
+                                self.risk_vars['risk_level'].set("LOW")
+                            else:
+                                balance = 0
+                                equity = 0
+                                drawdown = 0.0
+                            
+                            # Calculate current exposure and position count from MT5 positions
+                            positions = mt5.positions_get()
+                            if positions:
+                                current_exposure = sum(abs(p.volume * p.price_open) for p in positions)
+                                position_count = len(positions)
+                            else:
+                                current_exposure = 0.0
+                                position_count = 0
+                            
+                            # Update basic displays
+                            self.risk_vars['current_exposure'].set(f"${current_exposure:.2f}")
+                            self.risk_vars['position_count'].set(str(position_count))
+                            
+                            # Reset bot-specific metrics
+                            self.risk_vars['daily_pnl'].set("$0.00")
+                            self.risk_vars['daily_pnl_pct'].set("0.0%")
+                            self.risk_vars['daily_trades'].set("0")
+                            self.risk_vars['trades_pct'].set("0.0%")
+                            
+                        except Exception as e:
+                            # If MT5 not available, reset all
+                            self.reset_risk_display()
                 else:
-                    # No active bot
-                
-                    self.reset_risk_display()
+                    # No active bot - show basic metrics if MT5 available
+                    try:
+                        account = mt5.account_info()
+                        if account:
+                            balance = account.balance
+                            equity = account.equity
+                            
+                            # Calculate drawdown
+                            if balance > 0:
+                                drawdown = ((balance - equity) / balance) * 100
+                            else:
+                                drawdown = 0.0
+                            
+                            self.risk_vars['drawdown'].set(f"{drawdown:.2f}%")
+                            self.risk_vars['risk_level'].set("LOW")
+                            
+                            # Calculate current exposure and position count from MT5 positions
+                            positions = mt5.positions_get()
+                            if positions:
+                                current_exposure = sum(abs(p.volume * p.price_open) for p in positions)
+                                position_count = len(positions)
+                            else:
+                                current_exposure = 0.0
+                                position_count = 0
+                            
+                            # Update basic displays
+                            self.risk_vars['current_exposure'].set(f"${current_exposure:.2f}")
+                            self.risk_vars['position_count'].set(str(position_count))
+                            
+                            # Reset bot-specific metrics
+                            self.risk_vars['daily_pnl'].set("$0.00")
+                            self.risk_vars['daily_pnl_pct'].set("0.0%")
+                            self.risk_vars['daily_trades'].set("0")
+                            self.risk_vars['trades_pct'].set("0.0%")
+                        else:
+                            self.reset_risk_display()
+                    except Exception as e:
+                        self.reset_risk_display()
 
             except Exception as e:
                 pass  # Silent fail
