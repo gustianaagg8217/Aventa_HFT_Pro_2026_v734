@@ -43,6 +43,8 @@ OutputBaseFilename=Aventa_HFT_Pro_2026_v7_3_3_setup
 SetupIconFile=D:\Aventa AI\Project Aventa\Aventa_HFT_Pro_2026_v733\aventa.ico
 SolidCompression=yes
 WizardStyle=modern dark
+SignTool=signtool sign /fd SHA256 /t http://timestamp.digicert.com /n "PT Aventa Intelligent Power" $f
+; Alternative for self-signed: SignTool=signtool sign /fd SHA256 /sha1 3152A250B85E1AB0CDD1804146D80DC2D1EF1984 $f
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
