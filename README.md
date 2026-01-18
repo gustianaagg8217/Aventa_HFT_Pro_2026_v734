@@ -202,8 +202,14 @@ Sistem akan:
 - **Daily Trade Limits**: 1000 max trades per day
 - **Daily Volume Limits**: 10.0 max lots per day
 - **Floating Loss Control**: $5 max floating loss
-- **Drawdown Protection**: 50% max drawdown
+- **Drawdown Protection**: 50% max drawdown (resets daily)
 - **Volume Controls**: Position size limits
+
+**⚠️ Important Note on Drawdown Calculation:**
+The system uses **daily drawdown calculation** based on the daily peak equity, not historical all-time highs. This ensures that:
+- Drawdown resets to 0% at the start of each trading day
+- Risk limits are applied based on today's performance only
+- More accurate risk assessment for daily trading limits
 
 ---
 

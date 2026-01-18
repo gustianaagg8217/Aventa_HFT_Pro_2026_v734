@@ -164,6 +164,9 @@ class UltraLowLatencyEngine:
         self.peak_equity = initial_equity
         self.signals_generated = 0
         
+        # Daily reset tracking
+        self.last_reset_date = datetime.now().date()
+        
         # ========================================
         # STEP 11: Bot-specific stats
         # ========================================
@@ -294,6 +297,33 @@ class UltraLowLatencyEngine:
         except Exception as e:
             logger.error(f"Initialization error: {e}")
             return False
+    
+    def reset_daily_stats(self):
+        """Reset daily statistics for this bot"""
+        from datetime import datetime
+        
+        today = datetime.now().date()
+        if today > self.last_reset_date:
+            logger.info(f"Resetting daily stats for bot - Previous day: {self.last_reset_date}")
+            
+            # Get current account equity for daily peak reset
+            current_equity = self.get_account_equity()
+            if current_equity > 0:
+                self.peak_equity = current_equity
+                logger.info(f"✓ Daily peak equity reset to current: ${self.peak_equity:.2f}")
+            else:
+                # Fallback to initial balance if can't get current equity
+                self.peak_equity = self.bot_initial_balance
+                logger.info(f"✓ Daily peak equity reset to initial: ${self.peak_equity:.2f}")
+            
+            # Reset bot-specific daily stats
+            self.bot_trades_today = 0
+            self.bot_daily_pnl = 0.0
+            
+            self.last_reset_date = today
+            logger.info("✓ Daily stats reset complete for bot")
+        else:
+            logger.debug("Daily stats already reset for today")
     
     def get_tick_ultra_fast(self) -> Optional[TickData]:
         """Ultra-fast tick retrieval with microsecond timestamps"""
@@ -1087,6 +1117,9 @@ class UltraLowLatencyEngine:
             return False
 
         # Calculate real drawdown before entry
+        # ✅ Reset daily stats if it's a new day
+        self.reset_daily_stats()
+        
         current_equity = self.get_account_equity()
 
         if current_equity > self.peak_equity:
