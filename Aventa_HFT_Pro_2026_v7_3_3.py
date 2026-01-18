@@ -1162,6 +1162,7 @@ class HFTProGUI:
             """Get configuration from GUI fields"""
             try:  
                 config = {
+                    'bot_id': self.active_bot_id or 'unknown',
                     'symbol': self.symbol_var.get().strip(),
                     'default_volume': float(self.volume_var.get().strip()),
                     # ✅ FIX: MAGIC NUMBER HARUS ADA DI CONFIG!
@@ -1295,7 +1296,8 @@ class HFTProGUI:
                     bot['ml_predictor'] = ml_predictor
                     self.log_message(f"{self.active_bot_id}:  ML Predictor enabled", "INFO")
                 
-                bot['engine'] = UltraLowLatencyEngine(config['symbol'], config, bot['risk_manager'], ml_predictor)
+                bot['engine'] = UltraLowLatencyEngine(config['symbol'], config, bot['risk_manager'], ml_predictor, 
+                                                telegram_callback=lambda **kwargs: self.send_telegram_signal(self.active_bot_id, **kwargs))
                 
                 # Initialize and start
                 if bot['engine'].initialize():
@@ -1383,6 +1385,9 @@ class HFTProGUI:
                     self.update_button_states()
                 
                 self.log_message(f"✓ {bot_id} added successfully", "SUCCESS")
+                
+                # Update Telegram bot selector
+                self.update_telegram_bot_selector()
                 
             except Exception as e:
                 self.log_message(f"Add bot error: {e}", "ERROR")
@@ -1496,6 +1501,9 @@ class HFTProGUI:
                 self.save_session()
                 
                 self.log_message(f"✓ {bot_id} removed successfully", "SUCCESS")
+                
+                # Update Telegram bot selector
+                self.update_telegram_bot_selector()
                 
             except Exception as e:
                 self.log_message(f"Remove bot error: {e}", "ERROR")
@@ -2998,6 +3006,9 @@ class HFTProGUI:
                 # Initial status
                 self.update_telegram_status("Ready - Select a bot and configure Telegram settings")
 
+                # Update bot selector with current bots
+                self.update_telegram_bot_selector()
+                
             except Exception as e:
                 self.log_message(f"Build telegram tab error: {e}", "ERROR")
                 import traceback
@@ -3177,6 +3188,26 @@ This is a test message from Aventa HFT Pro 2026"""
                     self.telegram_status_text.insert(tk.END, message)
             except Exception as e:
                 pass
+
+        def update_telegram_bot_selector(self):
+            """Update the Telegram bot selector dropdown with current bots"""
+            try:
+                if hasattr(self, 'telegram_bot_selector'):
+                    current_selection = self.telegram_bot_selector.get()
+                    self.telegram_bot_selector['values'] = list(self.bots.keys())
+                    
+                    # Restore selection if it still exists
+                    if current_selection in self.bots:
+                        self.telegram_bot_selector.set(current_selection)
+                    elif self.bots:
+                        # Select first bot if current selection is invalid
+                        self.telegram_bot_selector.set(list(self.bots.keys())[0])
+                        # Load config for the selected bot
+                        self.on_telegram_bot_selected()
+                    else:
+                        self.telegram_bot_selector.set('')
+            except Exception as e:
+                self.log_message(f"Update telegram bot selector error: {e}", "ERROR")
 
         def send_telegram_signal(self, bot_id, signal_type, **kwargs):
             """Send trading signal to Telegram"""

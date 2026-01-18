@@ -89,7 +89,7 @@ class Signal:
 class UltraLowLatencyEngine:
     """Core HFT engine with microsecond precision"""
     
-    def __init__(self, symbol: str, config:  Dict, risk_manager=None, ml_predictor=None):
+    def __init__(self, symbol: str, config:  Dict, risk_manager=None, ml_predictor=None, telegram_callback=None):
         # ========================================
         # STEP 1: Initialize critical dependencies FIRST
         # ========================================
@@ -103,6 +103,7 @@ class UltraLowLatencyEngine:
         self.config = config
         self.risk_manager = risk_manager
         self.ml_predictor = ml_predictor
+        self.telegram_callback = telegram_callback
         
         # ========================================
         # STEP 3: Data structures
@@ -1142,6 +1143,28 @@ class UltraLowLatencyEngine:
                 self.position_price = result.price
                 
                 logger.info(f"✓ Bot trade #{self.bot_trades_today} opened:  {order_type} @ {result.price:.5f}")
+                
+                # Send Telegram signal for open position
+                if self.telegram_callback:
+                    try:
+                        account_info = mt5.account_info()
+                        if account_info:
+                            margin_level = (account_info.equity / account_info.margin) * 100 if account_info.margin > 0 else 0
+                            free_margin = account_info.margin_free
+                            
+                            self.telegram_callback(
+                                bot_id=self.config.get('bot_id', 'unknown'),
+                                signal_type='open_position',
+                                timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                open_entry=result.price,
+                                margin_level=margin_level,
+                                balance=account_info.balance,
+                                equity=account_info.equity,
+                                free_margin=free_margin
+                            )
+                    except Exception as e:
+                        logger.error(f"Telegram open signal error: {e}")
+                
                 return True
             else:
                 logger.warning(f"Order gagal: {result.retcode} - {result.comment}")
@@ -1224,6 +1247,29 @@ class UltraLowLatencyEngine:
                 self.bot_daily_pnl += profit
                 
                 logger.info(f"✓ Position closed:  Profit={profit:.2f} | Bot Balance:  ${self.bot_balance:.2f}")
+                
+                # Send Telegram signal for close position
+                if self.telegram_callback:
+                    try:
+                        account_info = mt5.account_info()
+                        if account_info:
+                            margin_level = (account_info.equity / account_info.margin) * 100 if account_info.margin > 0 else 0
+                            free_margin = account_info.margin_free
+                            total_lot_today = self.get_today_total_volume()
+                            
+                            self.telegram_callback(
+                                bot_id=self.config.get('bot_id', 'unknown'),
+                                signal_type='close_position',
+                                timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                close_entry=position.price_current,
+                                margin_level=margin_level,
+                                balance=account_info.balance,
+                                equity=account_info.equity,
+                                free_margin=free_margin,
+                                total_lot_today=total_lot_today
+                            )
+                    except Exception as e:
+                        logger.error(f"Telegram close signal error: {e}")
                 
                 # Record trade to risk_manager
                 if self.risk_manager:
@@ -1621,6 +1667,26 @@ class UltraLowLatencyEngine:
                 trade_count += 1
 
         return trade_count
+
+    def get_today_total_volume(self):
+        """Get total volume traded today for this bot"""
+        from datetime import datetime, time
+
+        now = datetime.now()
+        day_start = datetime.combine(now.date(), time.min)
+        deals = mt5.history_deals_get(day_start, now)
+
+        if deals is None:
+            return 0.0
+
+        total_volume = 0.0
+        magic = self.config.get('magic_number', 2026002)
+
+        for deal in deals:
+            if deal.magic == magic and deal.entry == mt5.DEAL_ENTRY_IN:
+                total_volume += deal.volume
+
+        return total_volume
 
     def get_today_trade_stats(self):
         from datetime import datetime, time, timezone
