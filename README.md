@@ -234,11 +234,13 @@ Sistem akan:
 ✅ Position closed successfully!
 ```
 
-### **Notification Triggers:**
-- ✅ **Position Opened**: Real-time entry alerts
-- ✅ **Position Closed**: Profit/loss notifications
-- ✅ **Error Alerts**: System issue notifications
-- ✅ **Risk Warnings**: Risk limit breaches
+### **Close Position Triggers:**
+- ✅ **Take Profit Hit**: Automatic close when TP target reached
+- ✅ **Stop Loss Hit**: Automatic close when SL triggered  
+- ✅ **Manual Close**: GUI button close all positions
+- ✅ **Risk Management**: Daily loss limits, floating loss limits
+- ✅ **Signal-based Close**: CLOSE signals from trading logic
+- ✅ **Emergency Close**: Circuit breaker activations
 
 ---
 
@@ -440,6 +442,26 @@ cp configs/ configs_backup/
 # Import settings
 # Test trading
 ```
+
+---
+
+## 🔄 **Recent Updates & Fixes**
+
+### **Version 7.3.3 - Telegram Integration**
+- ✅ **Fixed Close Position Notifications**: All position closes now send Telegram alerts
+- ✅ **Unified Signal Format**: Consistent parameters across all notification types
+- ✅ **Manual Close Notifications**: GUI close button now sends Telegram alerts
+- ✅ **Async Error Handling**: Improved Telegram API error handling
+- ✅ **Thread-safe Operations**: Background thread for Telegram sending
+
+### **Notification Coverage:**
+- **OPEN POSITION**: All new trades (BUY/SELL)
+- **CLOSE POSITION**: All position closures including:
+  - Take Profit hits
+  - Stop Loss triggers
+  - Manual closes
+  - Risk management closes
+  - Signal-based closes
 
 ---
 

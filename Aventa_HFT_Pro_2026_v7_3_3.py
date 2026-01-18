@@ -4493,6 +4493,16 @@ This is a test message from Aventa HFT Pro 2026"""
                         closed += 1
                         total_profit += position.profit
                         self.log_message(f"✓ Closed position #{position.ticket}:  ${position.profit:.2f}", "SUCCESS")
+                        
+                        # Send telegram notification for manual close
+                        if 'engine' in bot and bot['engine'].telegram_callback:
+                            bot['engine'].telegram_callback(
+                                signal_type="close_position",
+                                symbol=position.symbol,
+                                ticket=position.ticket,
+                                profit=position.profit,
+                                volume=position.volume
+                            )
                 
                 # Show summary
                 messagebox.showinfo(

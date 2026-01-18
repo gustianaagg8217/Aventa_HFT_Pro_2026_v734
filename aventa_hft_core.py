@@ -1250,25 +1250,13 @@ class UltraLowLatencyEngine:
                 
                 # Send Telegram signal for close position
                 if self.telegram_callback:
-                    try:
-                        account_info = mt5.account_info()
-                        if account_info:
-                            margin_level = (account_info.equity / account_info.margin) * 100 if account_info.margin > 0 else 0
-                            free_margin = account_info.margin_free
-                            total_lot_today = self.get_today_total_volume()
-                            
-                            self.telegram_callback(
-                                signal_type='close_position',
-                                timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                close_entry=position.price_current,
-                                margin_level=margin_level,
-                                balance=account_info.balance,
-                                equity=account_info.equity,
-                                free_margin=free_margin,
-                                total_lot_today=total_lot_today
-                            )
-                    except Exception as e:
-                        logger.error(f"Telegram close signal error: {e}")
+                    self.telegram_callback(
+                        signal_type="close_position",
+                        symbol=self.symbol,
+                        ticket=position.ticket,
+                        profit=position.profit,
+                        volume=position.volume
+                    )
                 
                 # Record trade to risk_manager
                 if self.risk_manager:
