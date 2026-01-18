@@ -429,6 +429,7 @@ class HFTProGUI:
             self.limit_vars = {
                 'max_daily_loss': tk.StringVar(value="40"),
                 'max_daily_trades': tk.StringVar(value="1000"),
+                'max_daily_volume': tk.StringVar(value="10"),
                 'max_position_size': tk.StringVar(value="2"),
                 'max_positions': tk.StringVar(value="20"),
                 'max_drawdown_pct': tk.StringVar(value="10")
@@ -1159,6 +1160,7 @@ class HFTProGUI:
                     limits = config['limits']
                     self.limit_vars['max_daily_loss'].set(limits.get('max_daily_loss', '40'))
                     self.limit_vars['max_daily_trades'].set(limits.get('max_daily_trades', '1000'))
+                    self.limit_vars['max_daily_volume'].set(limits.get('max_daily_volume', '10'))
                     self.limit_vars['max_position_size'].set(limits.get('max_position_size', '2'))
                     self.limit_vars['max_positions'].set(limits.get('max_positions', '20'))
                     self.limit_vars['max_drawdown_pct'].set(limits.get('max_drawdown_pct', '10'))
@@ -1202,6 +1204,7 @@ class HFTProGUI:
                     # Risk Limits
                     'max_daily_loss': float(self.limit_vars['max_daily_loss'].get().strip()),
                     'max_daily_trades': int(self.limit_vars['max_daily_trades'].get().strip()),
+                    'max_daily_volume': float(self.limit_vars['max_daily_volume'].get().strip()),
                     'max_position_size': float(self.limit_vars['max_position_size'].get().strip()),
                     'max_positions': int(self.limit_vars['max_positions'].get().strip()),
                     'max_drawdown_pct': float(self.limit_vars['max_drawdown_pct'].get().strip()),
@@ -1609,6 +1612,7 @@ class HFTProGUI:
                 # Risk Limits
                 'max_daily_loss': 40.0,
                 'max_daily_trades': 1000,
+                'max_daily_volume': 10.0,
                 'max_position_size':  2.0,
                 'max_positions': 20,
                 'max_drawdown_pct': 10.0
@@ -1632,6 +1636,7 @@ class HFTProGUI:
                     rm = self.bots[bot_id]['risk_manager']
                     rm.max_daily_loss = config['max_daily_loss']
                     rm.max_daily_trades = config['max_daily_trades']
+                    rm.max_daily_volume = config['max_daily_volume']
                     rm.max_position_size = config['max_position_size']
                     rm.max_positions = config['max_positions']
                     rm.max_drawdown_pct = config['max_drawdown_pct']
@@ -1687,6 +1692,7 @@ class HFTProGUI:
                 # === RISK LIMITS ===
                 self.limit_vars['max_daily_loss'].set(str(config.get('max_daily_loss', 40.0)))
                 self.limit_vars['max_daily_trades'].set(str(config.get('max_daily_trades', 1000)))
+                self.limit_vars['max_daily_volume'].set(str(config.get('max_daily_volume', 10.0)))
                 self.limit_vars['max_position_size'].set(str(config.get('max_position_size', 2.0)))
                 self.limit_vars['max_positions'].set(str(config.get('max_positions', 20)))
                 self.limit_vars['max_drawdown_pct'].set(str(config.get('max_drawdown_pct', 10.0)))
@@ -1844,6 +1850,9 @@ class HFTProGUI:
                 
                 ttk.Label(limits_row1, text="Max Daily Trades:", width=20).pack(side=tk.LEFT, padx=5)
                 ttk.Entry(limits_row1, textvariable=self.limit_vars['max_daily_trades'], width=15).pack(side=tk.LEFT, padx=5)
+                
+                ttk.Label(limits_row1, text="Max Daily Volume:", width=20).pack(side=tk.LEFT, padx=5)
+                ttk.Entry(limits_row1, textvariable=self.limit_vars['max_daily_volume'], width=15).pack(side=tk.LEFT, padx=5)
 
                 # Row 2: Max Position Size, Max Positions
                 limits_row2 = ttk.Frame(limits_frame)
@@ -1980,6 +1989,7 @@ class HFTProGUI:
                 # Update bot's config
                 bot['config']['max_daily_loss'] = float(self.limit_vars['max_daily_loss'].get())
                 bot['config']['max_daily_trades'] = int(self.limit_vars['max_daily_trades'].get())
+                bot['config']['max_daily_volume'] = float(self.limit_vars['max_daily_volume'].get())
                 bot['config']['max_position_size'] = float(self.limit_vars['max_position_size'].get())
                 bot['config']['max_positions'] = int(self.limit_vars['max_positions'].get())
                 bot['config']['max_drawdown_pct'] = float(self.limit_vars['max_drawdown_pct'].get())
@@ -1988,6 +1998,7 @@ class HFTProGUI:
                 if bot['risk_manager']:
                     bot['risk_manager'].max_daily_loss = bot['config']['max_daily_loss']
                     bot['risk_manager'].max_daily_trades = bot['config']['max_daily_trades']
+                    bot['risk_manager'].max_daily_volume = bot['config']['max_daily_volume']
                     bot['risk_manager'].max_position_size = bot['config']['max_position_size']
                     bot['risk_manager'].max_positions = bot['config']['max_positions']
                     bot['risk_manager'].max_drawdown_pct = bot['config']['max_drawdown_pct']

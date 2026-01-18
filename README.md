@@ -134,6 +134,7 @@ Edit `configs/Bot_5_config.json` untuk mengatur parameter trading:
     "max_positions": 5,
     "max_daily_loss": 150.0,
     "max_daily_trades": 1000,
+    "max_daily_volume": 10.0,
     "max_position_size": 1.0,
     "max_drawdown_pct": 50.0
 }
@@ -198,6 +199,8 @@ Sistem akan:
 ### **Risk Management:**
 - **Position Limits**: Max 5 positions per bot
 - **Daily Loss Limits**: $150 max daily loss
+- **Daily Trade Limits**: 1000 max trades per day
+- **Daily Volume Limits**: 10.0 max lots per day
 - **Floating Loss Control**: $5 max floating loss
 - **Drawdown Protection**: 50% max drawdown
 - **Volume Controls**: Position size limits
@@ -471,6 +474,7 @@ cp configs/ configs_backup/
 - ✅ **Account Information in Close Signals**: Added Balance, Equity, Free Margin, Margin Level
 - ✅ **Daily Volume Tracking**: Added Total Lot Today to close position notifications
 - ✅ **Real-time Account Summary**: Live MT5 account data in Telegram alerts
+- ✅ **Daily Drawdown Calculation**: Max drawdown % now resets daily, not accumulated from account opening
 
 ### **Notification Coverage:**
 - **OPEN POSITION**: All new trades (BUY/SELL)

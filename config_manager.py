@@ -48,6 +48,7 @@ class ConfigManager:
         # Risk Limits
         'max_daily_loss': 40.0,
         'max_daily_trades': 1000,
+        'max_daily_volume': 10.0,
         'max_position_size': 2.0,
         'max_positions':  20,
         'max_drawdown_pct': 10.0,

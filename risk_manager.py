@@ -22,6 +22,7 @@ class RiskMetrics:
     position_count: int
     daily_pnl: float
     daily_trades: int
+    daily_volume: float
     win_rate: float
     avg_profit: float
     avg_loss: float
@@ -54,6 +55,7 @@ class RiskManager:
         # Risk limits
         self.max_daily_loss = config.get('max_daily_loss', 1000)
         self.max_daily_trades = config.get('max_daily_trades', 500)
+        self.max_daily_volume = config.get('max_daily_volume', 10.0)
         self.max_position_size = config.get('max_position_size', 1.0)
         self.max_positions = config.get('max_positions', 3)
         self.max_drawdown_pct = config.get('max_drawdown_pct', 10)
@@ -66,6 +68,7 @@ class RiskManager:
         self.trade_history: List[TradeRecord] = []
         self.daily_pnl = 0.0
         self.daily_trades = 0
+        self.daily_volume = 0.0
         self.peak_balance = 0.0
         self.current_drawdown = 0.0
         
@@ -96,6 +99,9 @@ class RiskManager:
             
             self.daily_pnl = 0.0
             self.daily_trades = 0
+            self.daily_volume = 0.0
+            self.peak_balance = 0.0  # Will be set to current account balance
+            self.current_drawdown = 0.0  # Reset current drawdown
             self.last_reset_date = today
             
             # Reset circuit breaker if new day
@@ -123,6 +129,10 @@ class RiskManager:
         # Check daily trade limit
         if self.daily_trades >= self.max_daily_trades:
             return False, f"Daily trade limit reached: {self.daily_trades}/{self.max_daily_trades}"
+        
+        # Check daily volume limit
+        if self.daily_volume >= self.max_daily_volume:
+            return False, f"Daily volume limit reached: {self.daily_volume:.2f}/{self.max_daily_volume:.2f}"
         
         # Check drawdown
         if self.current_drawdown >= self.max_drawdown_pct:
@@ -237,6 +247,7 @@ class RiskManager:
         # Update daily stats
         self.daily_pnl += trade.profit
         self.daily_trades += 1
+        self.daily_volume += trade.volume
         
         # Update win/loss stats
         if trade.profit > 0:
@@ -246,19 +257,15 @@ class RiskManager:
             self.losses += 1
             self.total_loss += trade.profit
         
-        # Update drawdown
-        if self.daily_pnl > self.peak_balance:
-            self.peak_balance = self.daily_pnl
-        
-        if self.peak_balance > 0:
-            self.current_drawdown = ((self.peak_balance - self.daily_pnl) / self.peak_balance) * 100
+        # Note: Drawdown is now calculated in get_risk_metrics based on actual account balance
         
         # Log trade
         status = "WIN" if trade.profit > 0 else "LOSS"
         logger.info(f"Trade recorded: {status} | "
                    f"Profit: {trade.profit:.2f} | "
                    f"Daily PnL: {self.daily_pnl:.2f} | "
-                   f"Trades today: {self.daily_trades}")
+                   f"Trades today: {self.daily_trades} | "
+                   f"Volume today: {self.daily_volume:.2f}")
         
         # ✅ NEW:  Persist to database
         try:
@@ -362,6 +369,21 @@ class RiskManager:
     def get_risk_metrics(self, account_balance: float) -> RiskMetrics:
         """Calculate comprehensive risk metrics"""
         
+        # Update daily peak balance for drawdown calculation
+        if self.peak_balance == 0.0:
+            # Initialize peak balance at start of day
+            self.peak_balance = account_balance
+        elif account_balance > self.peak_balance:
+            # Update peak balance if current balance is higher
+            self.peak_balance = account_balance
+        
+        # Calculate daily drawdown based on account balance
+        if self.peak_balance > 0:
+            self.current_drawdown = ((self.peak_balance - account_balance) / self.peak_balance) * 100
+        else:
+            self.current_drawdown = 0.0
+        """Calculate comprehensive risk metrics"""
+        
         # Calculate metrics
         if len(self.trade_history) == 0:
             win_rate = 0
@@ -402,6 +424,7 @@ class RiskManager:
             position_count=0,  # To be filled by main system
             daily_pnl=self.daily_pnl,
             daily_trades=self.daily_trades,
+            daily_volume=self.daily_volume,
             win_rate=win_rate,
             avg_profit=avg_profit,
             avg_loss=avg_loss,

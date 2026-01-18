@@ -1066,6 +1066,16 @@ class UltraLowLatencyEngine:
             # Hanya warning, tidak close all dan tidak trigger circuit breaker
             return False
 
+        # Check daily volume limit
+        daily_volume = self.get_today_total_volume()
+        max_daily_volume = self.config.get("max_daily_volume", 0)
+
+        if max_daily_volume > 0 and daily_volume >= max_daily_volume:
+            logger.warning(
+                f"🚨 MAX DAILY VOLUME HIT: {daily_volume:.2f}/{max_daily_volume:.2f}"
+            )
+            return False
+
         # Enforcement: max total position volume
         current_volume = self.get_total_position_volume()
         max_position_size = self.config.get("max_position_size", 0)
