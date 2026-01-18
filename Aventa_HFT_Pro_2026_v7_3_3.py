@@ -3380,12 +3380,13 @@ This is a test message from Aventa HFT Pro 2026"""
 
 🚀 Position opened successfully!"""
 
-        def format_close_position_signal(self, bot_id, symbol, ticket, profit, volume, balance=None, equity=None, free_margin=None, margin_level=None):
+        def format_close_position_signal(self, bot_id, symbol, ticket, profit, volume, balance=None, equity=None, free_margin=None, margin_level=None, total_volume_today=None):
             """Format close position signal message (includes account info). Always show account fields (or N/A)."""
             balance_str = f"${balance:.2f}" if balance is not None else "N/A"
             equity_str = f"${equity:.2f}" if equity is not None else "N/A"
             free_margin_str = f"${free_margin:.2f}" if free_margin is not None else "N/A"
             margin_level_str = f"{margin_level:.2f}%" if margin_level is not None else "N/A"
+            total_volume_str = f"{total_volume_today:.2f}" if total_volume_today is not None else "N/A"
 
             acct_lines = (
                 f"\n\nAccount Summary:\n"
@@ -3393,6 +3394,7 @@ This is a test message from Aventa HFT Pro 2026"""
                 f"Equity: {equity_str}\n"
                 f"Free Margin: {free_margin_str}\n"
                 f"Margin Level: {margin_level_str}\n"
+                f"Total Lot Today: {total_volume_str}\n"
             )
 
             return f"""🔴 CLOSE POSITION SIGNAL
