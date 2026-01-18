@@ -1248,14 +1248,31 @@ class UltraLowLatencyEngine:
                 
                 logger.info(f"✓ Position closed:  Profit={profit:.2f} | Bot Balance:  ${self.bot_balance:.2f}")
                 
-                # Send Telegram signal for close position
+                # Send Telegram signal for close position (include account info)
                 if self.telegram_callback:
+                    try:
+                        account_info = mt5.account_info()
+                        if account_info:
+                            balance = account_info.balance
+                            equity = account_info.equity
+                            free_margin = account_info.margin_free
+                            margin = account_info.margin
+                            margin_level = (equity / margin) * 100 if margin and margin > 0 else 0
+                        else:
+                            balance = equity = free_margin = margin_level = None
+                    except Exception:
+                        balance = equity = free_margin = margin_level = None
+
                     self.telegram_callback(
                         signal_type="close_position",
                         symbol=self.symbol,
                         ticket=position.ticket,
                         profit=position.profit,
-                        volume=position.volume
+                        volume=position.volume,
+                        balance=balance,
+                        equity=equity,
+                        free_margin=free_margin,
+                        margin_level=margin_level
                     )
                 
                 # Record trade to risk_manager

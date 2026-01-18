@@ -3380,8 +3380,21 @@ This is a test message from Aventa HFT Pro 2026"""
 
 🚀 Position opened successfully!"""
 
-        def format_close_position_signal(self, bot_id, symbol, ticket, profit, volume):
-            """Format close position signal message"""
+        def format_close_position_signal(self, bot_id, symbol, ticket, profit, volume, balance=None, equity=None, free_margin=None, margin_level=None):
+            """Format close position signal message (includes account info). Always show account fields (or N/A)."""
+            balance_str = f"${balance:.2f}" if balance is not None else "N/A"
+            equity_str = f"${equity:.2f}" if equity is not None else "N/A"
+            free_margin_str = f"${free_margin:.2f}" if free_margin is not None else "N/A"
+            margin_level_str = f"{margin_level:.2f}%" if margin_level is not None else "N/A"
+
+            acct_lines = (
+                f"\n\nAccount Summary:\n"
+                f"Balance: {balance_str}\n"
+                f"Equity: {equity_str}\n"
+                f"Free Margin: {free_margin_str}\n"
+                f"Margin Level: {margin_level_str}\n"
+            )
+
             return f"""🔴 CLOSE POSITION SIGNAL
 
 🤖 Bot: {bot_id}
@@ -3389,9 +3402,10 @@ This is a test message from Aventa HFT Pro 2026"""
 🎫 Ticket: {ticket}
 💰 Profit: ${profit:.2f}
 📦 Volume: {volume:.2f}
-🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-✅ Position closed successfully!"""
+✅ Position closed successfully!{acct_lines}\n🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+"""
 
         def build_ml_tab(self):
             """Build ML Models tab"""
@@ -4494,14 +4508,31 @@ This is a test message from Aventa HFT Pro 2026"""
                         total_profit += position.profit
                         self.log_message(f"✓ Closed position #{position.ticket}:  ${position.profit:.2f}", "SUCCESS")
                         
-                        # Send telegram notification for manual close
+                        # Send telegram notification for manual close (include account info)
                         if 'engine' in bot and bot['engine'].telegram_callback:
+                            try:
+                                account_info = mt5.account_info()
+                                if account_info:
+                                    balance = account_info.balance
+                                    equity = account_info.equity
+                                    free_margin = account_info.margin_free
+                                    margin = account_info.margin
+                                    margin_level = (equity / margin) * 100 if margin and margin > 0 else 0
+                                else:
+                                    balance = equity = free_margin = margin_level = None
+                            except Exception:
+                                balance = equity = free_margin = margin_level = None
+
                             bot['engine'].telegram_callback(
                                 signal_type="close_position",
                                 symbol=position.symbol,
                                 ticket=position.ticket,
                                 profit=position.profit,
-                                volume=position.volume
+                                volume=position.volume,
+                                balance=balance,
+                                equity=equity,
+                                free_margin=free_margin,
+                                margin_level=margin_level
                             )
                 
                 # Show summary
