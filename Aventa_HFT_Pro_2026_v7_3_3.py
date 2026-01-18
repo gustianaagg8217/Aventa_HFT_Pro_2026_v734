@@ -3331,6 +3331,7 @@ This is a test message from Aventa HFT Pro 2026"""
                     return
 
                 import asyncio
+                import threading
                 from telegram import Bot
 
                 async def send_signal():
@@ -3345,8 +3346,16 @@ This is a test message from Aventa HFT Pro 2026"""
                     except Exception as e:
                         self.log_message(f"Telegram signal error: {e}", "ERROR")
 
-                # Run in background
-                asyncio.create_task(send_signal())
+                # Handle event loop properly - run in background thread
+                def run_async():
+                    try:
+                        asyncio.run(send_signal())
+                    except Exception as e:
+                        self.log_message(f"Async telegram send error: {e}", "ERROR")
+
+                # Start in background thread to avoid blocking
+                thread = threading.Thread(target=run_async, daemon=True)
+                thread.start()
                 
                 # Update status
                 self.update_telegram_status(f"✅ {signal_type.upper()} signal sent to Telegram for bot: {bot_id}")
