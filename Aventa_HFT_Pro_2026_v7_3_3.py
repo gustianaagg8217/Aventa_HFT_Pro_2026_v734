@@ -2115,15 +2115,32 @@ class HFTProGUI:
                 if self.active_bot_id and self.active_bot_id in self.bots:
                     bot = self.bots[self.active_bot_id]
                     
+                    # Always get daily stats from database for consistency
+                    daily_pnl = 0.0
+                    daily_trades = 0
+                    try:
+                        db_stats = self.trade_db.get_daily_stats(self.active_bot_id)
+                        daily_pnl = db_stats.get('total_pnl', 0)
+                        daily_trades = db_stats.get('total_trades', 0)
+                    except Exception as e:
+                        pass
+                    
                     if bot['is_running'] and bot['risk_manager'] and bot['engine']:
                         # Get account info
                         account = mt5.account_info()
                         if account:
                             balance = account.balance
                             equity = account.equity
+                            
+                            # Calculate current drawdown from account info
+                            if balance > 0:
+                                drawdown = ((balance - equity) / balance) * 100
+                            else:
+                                drawdown = 0.0
                         else:
                             balance = 0
                             equity = 0
+                            drawdown = 0.0
 
                         # Get risk metrics from active bot's risk manager
                         metrics = bot['risk_manager'].get_risk_metrics(balance)
@@ -2144,17 +2161,17 @@ class HFTProGUI:
                         # Update displays
                         self.risk_vars['current_exposure'].set(f"${current_exposure:.2f}")
                         self.risk_vars['position_count'].set(str(position_count))
-                        self.risk_vars['daily_pnl'].set(f"${metrics.daily_pnl:.2f}")
+                        self.risk_vars['daily_pnl'].set(f"${daily_pnl:.2f}")
                         
                         # Calculate percentages
-                        pnl_pct = (abs(metrics.daily_pnl) / bot['risk_manager'].max_daily_loss * 100) if bot['risk_manager'].max_daily_loss > 0 else 0
+                        pnl_pct = (abs(daily_pnl) / bot['risk_manager'].max_daily_loss * 100) if bot['risk_manager'].max_daily_loss > 0 else 0
                         self.risk_vars['daily_pnl_pct'].set(f"{pnl_pct:.1f}%")
                         
-                        trades_pct = (metrics.daily_trades / bot['risk_manager'].max_daily_trades * 100) if bot['risk_manager'].max_daily_trades > 0 else 0
+                        trades_pct = (daily_trades / bot['risk_manager'].max_daily_trades * 100) if bot['risk_manager'].max_daily_trades > 0 else 0
                         self.risk_vars['trades_pct'].set(f"{trades_pct:.1f}%")
 
-                        self.risk_vars['daily_trades'].set(str(metrics.daily_trades))
-                        self.risk_vars['drawdown'].set(f"{metrics.max_drawdown:.2f}%")
+                        self.risk_vars['daily_trades'].set(str(daily_trades))
+                        self.risk_vars['drawdown'].set(f"{drawdown:.2f}%")
                         self.risk_vars['risk_level'].set(metrics.risk_level)
 
                         # Update circuit breaker status
@@ -2192,16 +2209,6 @@ class HFTProGUI:
                             else:
                                 current_exposure = 0.0
                                 position_count = 0
-                            
-                            # Get daily P&L from database if available
-                            daily_pnl = 0.0
-                            daily_trades = 0
-                            try:
-                                db_stats = self.trade_db.get_daily_stats(self.active_bot_id)
-                                daily_pnl = db_stats.get('total_pnl', 0)
-                                daily_trades = db_stats.get('total_trades', 0)
-                            except Exception as e:
-                                pass
                             
                             # Update basic displays
                             self.risk_vars['current_exposure'].set(f"${current_exposure:.2f}")
