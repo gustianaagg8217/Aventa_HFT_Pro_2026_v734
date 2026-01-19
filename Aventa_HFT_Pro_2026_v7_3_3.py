@@ -2186,44 +2186,79 @@ class HFTProGUI:
                             balance = 0
                             equity = 0
 
-                        # Get risk metrics from active bot's risk manager
-                        metrics = bot['risk_manager'].get_risk_metrics(balance)
+                        # Get MT5 positions for this bot's magic number
+                        magic = bot['risk_manager'].config.get('magic_number', 2026002)
+                        positions = mt5.positions_get(symbol=bot['engine'].symbol)
+                        bot_positions = []
+                        if positions:
+                            bot_positions = [p for p in positions if p.magic == magic]
 
-                        # Update displays
-                        self.risk_vars['current_exposure'].set(f"${metrics.current_exposure:.2f}")
-                        self.risk_vars['position_count'].set(str(metrics.position_count))
-                        self.risk_vars['daily_pnl'].set(f"${metrics.daily_pnl:.2f}")
+                        # ✅ FIX: Get daily_trades and daily_pnl from ENGINE instead of risk_manager
+                        # The engine tracks actual trades executed, risk_manager only tracks recorded trades
+                        engine_snapshot = bot['engine'].get_performance_snapshot()
+                        daily_trades_actual = engine_snapshot.get('trades_today', 0)
+                        daily_pnl_actual = engine_snapshot.get('daily_pnl', 0.0)
                         
-                        # Calculate percentages
-                        pnl_pct = (abs(metrics.daily_pnl) / bot['risk_manager'].max_daily_loss * 100) if bot['risk_manager'].max_daily_loss > 0 else 0
-                        self.risk_vars['daily_pnl_pct'].set(f"{pnl_pct:.1f}%")
+                        # Get risk metrics from active bot's risk manager (now with position data)
+                        try:
+                            # ✅ Also sync risk_manager's counters with engine's actual data
+                            bot['risk_manager'].daily_trades = daily_trades_actual
+                            bot['risk_manager'].daily_pnl = daily_pnl_actual
+                            
+                            metrics = bot['risk_manager'].get_risk_metrics(balance, bot_positions)
+                            
+                            # Update displays with safe access
+                            self.risk_vars['current_exposure'].set(f"${metrics.current_exposure:.2f}")
+                            self.risk_vars['position_count'].set(str(metrics.position_count))
+                            
+                            # ✅ USE ACTUAL VALUES FROM ENGINE
+                            self.risk_vars['daily_pnl'].set(f"${daily_pnl_actual:.2f}")
+                            self.risk_vars['daily_trades'].set(str(daily_trades_actual))
+                            
+                            # Calculate percentages safely
+                            max_daily_loss = bot['risk_manager'].max_daily_loss
+                            max_daily_trades = bot['risk_manager'].max_daily_trades
+                            
+                            pnl_pct = (abs(daily_pnl_actual) / max_daily_loss * 100) if max_daily_loss > 0 else 0
+                            self.risk_vars['daily_pnl_pct'].set(f"{pnl_pct:.1f}%")
+                            
+                            trades_pct = (daily_trades_actual / max_daily_trades * 100) if max_daily_trades > 0 else 0
+                            self.risk_vars['trades_pct'].set(f"{trades_pct:.1f}%")
+
+                            self.risk_vars['drawdown'].set(f"{metrics.max_drawdown:.2f}%")
+                            self.risk_vars['risk_level'].set(metrics.risk_level)
+
+                            # Update circuit breaker status
+                            if bot['risk_manager'].circuit_breaker_triggered:
+                                reason = bot['risk_manager'].last_circuit_reason or "Unknown"
+                                self.circuit_breaker_status.set(f"❌ TRIGGERED - {reason}")
+                                self.circuit_breaker_reason.set(reason)
+                            else:
+                                self.circuit_breaker_status.set("✅ INACTIVE - Trading Allowed")
+                                self.circuit_breaker_reason.set("No breaches detected")
+
+                            # Log critical events
+                            if metrics.risk_level == 'CRITICAL' and not bot['risk_manager'].circuit_breaker_triggered:
+                                self.add_risk_event(f"⚠️ {self.active_bot_id} CRITICAL RISK - P&L: ${daily_pnl_actual:.2f}", "CRITICAL")
                         
-                        trades_pct = (metrics.daily_trades / bot['risk_manager'].max_daily_trades * 100) if bot['risk_manager'].max_daily_trades > 0 else 0
-                        self.risk_vars['trades_pct'].set(f"{trades_pct:.1f}%")
-
-                        self.risk_vars['daily_trades'].set(str(metrics.daily_trades))
-                        self.risk_vars['drawdown'].set(f"{metrics.max_drawdown:.2f}%")
-                        self.risk_vars['risk_level'].set(metrics.risk_level)
-
-                        # Update circuit breaker status
-                        self.circuit_breaker_reason.set("No breaches detected")
-
-                        # Log critical events
-                        if metrics.risk_level == 'CRITICAL' and not bot['risk_manager'].circuit_breaker_triggered:
-                            self.add_risk_event(f"⚠️ {self.active_bot_id} CRITICAL RISK - P&L: ${metrics.daily_pnl:.2f}", "CRITICAL")
+                        except Exception as e:
+                            self.log_message(f"Error getting risk metrics: {e}", "ERROR")
+                            self.reset_risk_display()
                     else:
                         # Bot not running - reset displays
                         self.reset_risk_display()
                 else:
                     # No active bot
-                
                     self.reset_risk_display()
 
             except Exception as e:
-                pass  # Silent fail
+                self.log_message(f"Error updating risk metrics: {e}", "ERROR")
             
             finally:
-                self.root.after(1000, self.update_risk_metrics)
+                try:
+                    self.root.after(1000, self.update_risk_metrics)
+                except:
+                    pass  # Root window may have been destroyed
 
         def add_risk_event(self, message, level="INFO"):
             """Add risk event to log"""

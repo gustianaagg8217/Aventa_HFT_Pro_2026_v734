@@ -366,7 +366,7 @@ class RiskManager:
         
         return None
     
-    def get_risk_metrics(self, account_balance: float) -> RiskMetrics:
+    def get_risk_metrics(self, account_balance: float, mt5_positions=None) -> RiskMetrics:
         """Calculate comprehensive risk metrics"""
         
         # Update daily peak balance for drawdown calculation
@@ -382,7 +382,18 @@ class RiskManager:
             self.current_drawdown = ((self.peak_balance - account_balance) / self.peak_balance) * 100
         else:
             self.current_drawdown = 0.0
-        """Calculate comprehensive risk metrics"""
+        
+        # Calculate position exposure and count from MT5
+        current_exposure = 0.0
+        position_count = 0
+        
+        if mt5_positions:
+            magic = self.config.get('magic_number', 2026002)
+            for pos in mt5_positions:
+                if pos.magic == magic:
+                    # Exposure = volume * current_price
+                    current_exposure += pos.volume * pos.price_current
+                    position_count += 1
         
         # Calculate metrics
         if len(self.trade_history) == 0:
@@ -402,8 +413,11 @@ class RiskManager:
         
         # Calculate Sharpe ratio (simplified)
         if len(self.trade_history) > 10:
-            returns = [t.profit / account_balance for t in self.trade_history[-100:]]
-            sharpe_ratio = np.mean(returns) / (np.std(returns) + 1e-10) * np.sqrt(252)
+            returns = [t.profit / account_balance for t in self.trade_history[-100:] if account_balance > 0]
+            if returns:
+                sharpe_ratio = np.mean(returns) / (np.std(returns) + 1e-10) * np.sqrt(252)
+            else:
+                sharpe_ratio = 0
         else:
             sharpe_ratio = 0
         
@@ -420,8 +434,8 @@ class RiskManager:
             risk_level = 'LOW'
         
         return RiskMetrics(
-            current_exposure=0.0,  # To be filled by main system
-            position_count=0,  # To be filled by main system
+            current_exposure=current_exposure,  # Now calculated from MT5 positions
+            position_count=position_count,  # Now calculated from MT5 positions
             daily_pnl=self.daily_pnl,
             daily_trades=self.daily_trades,
             daily_volume=self.daily_volume,
