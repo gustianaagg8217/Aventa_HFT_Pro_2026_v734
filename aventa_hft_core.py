@@ -1289,6 +1289,14 @@ class UltraLowLatencyEngine:
                         logger.error(f"Failed to get account info during position open: {e}")
                         balance = equity = free_margin = margin_level = None
                     
+                    # ✅ NEW: Get total volume traded today
+                    try:
+                        total_volume_today = self.get_today_total_volume()
+                        logger.info(f"Total volume today: {total_volume_today:.2f}")
+                    except Exception as e:
+                        logger.error(f"Failed to get total volume today: {e}")
+                        total_volume_today = 0.0
+                    
                     self.telegram_callback(
                         signal_type="open_position",
                         symbol=self.symbol,
@@ -1300,7 +1308,8 @@ class UltraLowLatencyEngine:
                         balance=balance,
                         equity=equity,
                         free_margin=free_margin,
-                        margin_level=margin_level
+                        margin_level=margin_level,
+                        total_volume_today=total_volume_today
                     )
                 
                 return True

@@ -310,6 +310,7 @@ class HFTProGUI:
                 'signals': tk.StringVar(value="0"),
                 'position': tk.StringVar(value="None"),
                 'position_vol': tk.StringVar(value="0.00"),
+                'total_lot_today': tk.StringVar(value="0.00"),
                 'balance': tk.StringVar(value="$0.00"),
                 'equity': tk.StringVar(value="$0.00"),
                 'floating': tk.StringVar(value="$0.00"),
@@ -890,7 +891,7 @@ class HFTProGUI:
                 self.create_metric_display(metrics_row1, "Losses:", self.perf_vars['losses'], width=10)
                 self.create_metric_display(metrics_row1, "Win Rate:", self.perf_vars['win_rate'], width=12)
 
-                # Row 2: Daily P&L, Signals, Position, Volume
+                # Row 2: Daily P&L, Signals, Position, Volume, Total Lot Today
                 metrics_row2 = ttk.Frame(metrics_frame)
                 metrics_row2.pack(fill=tk.X, pady=2)
                 
@@ -898,6 +899,7 @@ class HFTProGUI:
                 self.create_metric_display(metrics_row2, "Signals:", self.perf_vars['signals'], width=10)
                 self.create_metric_display(metrics_row2, "Position:", self.perf_vars['position'], width=10)
                 self.create_metric_display(metrics_row2, "Volume:", self.perf_vars['position_vol'], width=10)
+                self.create_metric_display(metrics_row2, "Total Lot Today:", self.perf_vars['total_lot_today'], width=15)
 
                 # === ACCOUNT METRICS ===
                 account_frame = ttk.LabelFrame(main_container, text="💰 Account Status", padding=10)
@@ -1100,6 +1102,9 @@ class HFTProGUI:
                             signals = int(snapshot.get('signals_generated', 0) or 0)
                             position_vol = float(snapshot.get('position_volume', 0) or 0)
                             
+                            # ✅ NEW: Get total lot today from risk manager's daily_volume tracker
+                            daily_volume_total = bot['risk_manager'].daily_volume if bot['risk_manager'] else 0.0
+                            
                             self.perf_vars['trades_today'].set(str(trades))
                             self.perf_vars['wins'].set(str(wins))
                             self.perf_vars['losses'].set(str(losses))
@@ -1108,6 +1113,7 @@ class HFTProGUI:
                             self.perf_vars['signals'].set(str(signals))
                             self.perf_vars['position'].set(str(snapshot.get('current_position', 'None') or 'None'))
                             self.perf_vars['position_vol'].set(safe_format(position_vol, decimals=2))
+                            self.perf_vars['total_lot_today'].set(safe_format(daily_volume_total, decimals=2))
                         except Exception as e:
                             self.log_message(f"Error updating trading metrics: {e}", "WARNING")
                         
@@ -1183,6 +1189,7 @@ class HFTProGUI:
                 self.perf_vars['signals'].set("0")
                 self.perf_vars['position'].set("None")
                 self.perf_vars['position_vol'].set("0.00")
+                self.perf_vars['total_lot_today'].set("0.00")
                 self.perf_vars['balance'].set("$0.00")
                 self.perf_vars['equity'].set("$0.00")
                 self.perf_vars['floating'].set("$0.00")
@@ -3645,13 +3652,14 @@ This is a test message from Aventa HFT Pro 2026"""
                 self.log_message(error_msg, "ERROR")
                 self.update_telegram_status(error_msg)
 
-        def format_open_position_signal(self, bot_id, symbol, order_type, volume, price, sl, tp, balance=None, equity=None, free_margin=None, margin_level=None):
+        def format_open_position_signal(self, bot_id, symbol, order_type, volume, price, sl, tp, balance=None, equity=None, free_margin=None, margin_level=None, total_volume_today=None):
             """Format open position signal message"""
             # Format account info with N/A fallback
             balance_str = f"${balance:.2f}" if balance is not None else "N/A"
             equity_str = f"${equity:.2f}" if equity is not None else "N/A"
             free_margin_str = f"${free_margin:.2f}" if free_margin is not None else "N/A"
             margin_level_str = f"{margin_level:.2f}%" if margin_level is not None else "N/A"
+            total_volume_str = f"{total_volume_today:.2f}" if total_volume_today is not None else "N/A"
 
             return f"""🔵 OPEN POSITION SIGNAL
 
@@ -3668,6 +3676,7 @@ This is a test message from Aventa HFT Pro 2026"""
 📊 Equity: {equity_str}
 🆓 Free Margin: {free_margin_str}
 📊 Margin Level: {margin_level_str}
+📊 Total Lot Today: {total_volume_str}
 
 🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
