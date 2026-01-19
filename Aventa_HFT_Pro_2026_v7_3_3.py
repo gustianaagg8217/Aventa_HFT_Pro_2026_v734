@@ -1424,11 +1424,28 @@ class HFTProGUI:
                 
                 # Create ML predictor first if enabled
                 ml_predictor = None
-                if config.get('enable_ml', False):
+                enable_ml = config.get('enable_ml', False)
+                
+                if enable_ml:
                     from ml_predictor import MLPredictor
                     ml_predictor = MLPredictor(config['symbol'], config)
                     bot['ml_predictor'] = ml_predictor
-                    self.log_message(f"{self.active_bot_id}:  ML Predictor enabled", "INFO")
+                    
+                    # Check if ML model is trained
+                    if ml_predictor.is_trained:
+                        self.log_message(f"✅ {self.active_bot_id}: ML Predictor ENABLED & TRAINED (Ready to use)", "SUCCESS")
+                    else:
+                        self.log_message(f"⚠️  {self.active_bot_id}: ML Predictor ENABLED but NOT YET TRAINED!", "WARNING")
+                        self.log_message(f"   → All trading signals will be REJECTED until you train the model!", "WARNING")
+                        self.log_message(f"   → Go to 'ML Training' tab to train the model first.", "INFO")
+                        messagebox.showwarning(
+                            "ML Model Not Trained",
+                            f"ML Prediction is ENABLED for {self.active_bot_id}, but the model is not trained yet.\n\n"
+                            f"⚠️  WARNING: All trading signals will be REJECTED until the model is trained!\n\n"
+                            f"Please go to the 'ML Training' tab and train the model first."
+                        )
+                else:
+                    self.log_message(f"{self.active_bot_id}: ML Prediction DISABLED (Technical signals only)", "INFO")
                 
                 bot['engine'] = UltraLowLatencyEngine(config['symbol'], config, bot['risk_manager'], ml_predictor, 
                                                 telegram_callback=lambda **data: self.send_telegram_signal(bot_id=self.active_bot_id, **data))
@@ -1921,6 +1938,20 @@ class HFTProGUI:
 
                 # ✅ ADD: Update ML status display
                 self.update_ml_status_display()
+                
+                # ✅ NEW: Log ML status when switching bots
+                config = bot['config']
+                enable_ml = config.get('enable_ml', False)
+                ml_predictor = bot.get('ml_predictor')
+                
+                if enable_ml:
+                    if ml_predictor and ml_predictor.is_trained:
+                        self.log_message(f"✅ {bot_id}: ML Prediction ENABLED & TRAINED (Ready to assist decisions)", "SUCCESS")
+                    else:
+                        self.log_message(f"⚠️  {bot_id}: ML Prediction ENABLED but NOT YET TRAINED", "WARNING")
+                        self.log_message(f"   Go to 'ML Training' tab to train the model", "INFO")
+                else:
+                    self.log_message(f"🔵 {bot_id}: ML Prediction DISABLED (Technical signals only)", "INFO")
 
                 self.log_message(f"✓ Switched to {bot_id}", "INFO")
                 
@@ -2871,18 +2902,20 @@ class HFTProGUI:
                         self.root.after(0, lambda: self.add_bt_log("✓ Backtester initialized", "SUCCESS"))
                         backtester = StrategyBacktester(config, initial_balance)  # ← CRITICAL!
                         
-                        # ✅ CHECK SYMBOL AVAILABILITY BEFORE BACKTEST
+                        # ✅ CHECK SYMBOL AVAILABILITY WITH FUZZY MATCHING
                         self.root.after(0, lambda: self.add_bt_log(f"🔍 Checking symbol availability...", "INFO"))
-                        available_symbols = backtester.get_available_symbols()
+                        actual_symbol = backtester.find_symbol_in_mt5(symbol)
                         
-                        if symbol not in available_symbols:
-                            self.root.after(0, lambda: self.add_bt_log(f"❌ Symbol {symbol} NOT FOUND in MT5", "ERROR"))
+                        if not actual_symbol:
+                            # Symbol not found
+                            available_symbols = backtester.get_available_symbols()
+                            self.root.after(0, lambda: self.add_bt_log(f"❌ Symbol '{symbol}' NOT FOUND in MT5", "ERROR"))
                             self.root.after(0, lambda: self.add_bt_log(f"Available symbols (first 20): {', '.join(available_symbols[:20])}", "INFO"))
-                            self.root.after(0, lambda: self.add_bt_log("Please check Terminal and ensure symbol is available.", "ERROR"))
+                            self.root.after(0, lambda: self.add_bt_log("Trying with case-insensitive matching or partial matching...", "INFO"))
                             self.root.after(0, lambda: self.bt_progress_label.set("Symbol not available"))
                             return
                         
-                        self.root.after(0, lambda: self.add_bt_log(f"✓ Symbol {symbol} is available", "SUCCESS"))
+                        self.root.after(0, lambda: self.add_bt_log(f"✓ Symbol found: '{symbol}' → '{actual_symbol}'", "SUCCESS"))
                         
                         # Run backtest with progress tracking
                         self.root.after(0, lambda: self.add_bt_log("⏳ Running backtest simulation...", "INFO"))
@@ -3536,16 +3569,29 @@ This is a test message from Aventa HFT Pro 2026"""
                 self.log_message(f"Update telegram bot selector error: {e}", "ERROR")
 
         def send_telegram_signal(self, bot_id, signal_type, **kwargs):
-            """Send trading signal to Telegram"""
+            """Send trading signal to Telegram for SPECIFIC BOT ONLY"""
             try:
                 self.log_message(f"Sending telegram signal for bot {bot_id}: {signal_type}", "INFO")
+                
+                # ✅ CRITICAL: Check bot exists
+                if bot_id not in self.bots:
+                    self.log_message(f"❌ Bot {bot_id} does not exist!", "ERROR")
+                    return
+                
+                # ✅ CRITICAL: Check bot has telegram config
                 if bot_id not in self.telegram_bots:
-                    self.log_message(f"No telegram config found for bot {bot_id}", "WARNING")
+                    self.log_message(f"⚠️ No telegram config for bot {bot_id} - signal not sent", "WARNING")
                     return
 
-                bot = self.telegram_bots[bot_id]
-                chat_ids = bot.allowed_users
+                # ✅ GET BOT'S SPECIFIC TELEGRAM CONFIG
+                bot_telegram = self.telegram_bots[bot_id]
+                chat_ids = bot_telegram.allowed_users
+                
+                if not chat_ids:
+                    self.log_message(f"⚠️ Bot {bot_id} has no chat IDs configured - signal not sent", "WARNING")
+                    return
 
+                # Format message based on signal type
                 if signal_type == 'open_position':
                     message = self.format_open_position_signal(bot_id=bot_id, **kwargs)
                 elif signal_type == 'close_position':
@@ -3553,6 +3599,7 @@ This is a test message from Aventa HFT Pro 2026"""
                 elif signal_type == 'clear_all_positions':
                     message = self.format_clear_all_positions_signal(bot_id=bot_id, **kwargs)
                 else:
+                    self.log_message(f"Unknown signal type: {signal_type}", "ERROR")
                     return
 
                 import asyncio
@@ -3560,35 +3607,43 @@ This is a test message from Aventa HFT Pro 2026"""
                 from telegram import Bot
 
                 async def send_signal():
+                    """Send signal to all chat IDs for this specific bot"""
                     try:
-                        telegram_bot = Bot(token=bot.token)
+                        telegram_bot = Bot(token=bot_telegram.token)
                         for chat_id in chat_ids:
                             try:
                                 await telegram_bot.send_message(chat_id=chat_id, text=message)
-                                self.log_message(f"Telegram signal sent to {chat_id} for bot {bot_id}: {signal_type}", "INFO")
+                                self.log_message(
+                                    f"✅ Telegram signal sent to {chat_id} (Bot: {bot_id})",
+                                    "SUCCESS"
+                                )
                             except Exception as e:
-                                self.log_message(f"Failed to send Telegram signal to {chat_id}: {e}", "ERROR")
+                                self.log_message(
+                                    f"❌ Failed to send to {chat_id} for {bot_id}: {str(e)[:100]}",
+                                    "ERROR"
+                                )
                     except Exception as e:
-                        self.log_message(f"Telegram signal error: {e}", "ERROR")
+                        self.log_message(f"Telegram send error for {bot_id}: {e}", "ERROR")
 
-                # Handle event loop properly - run in background thread
+                # Run in background thread to avoid blocking
                 def run_async():
                     try:
                         asyncio.run(send_signal())
                     except Exception as e:
-                        self.log_message(f"Async telegram send error: {e}", "ERROR")
+                        self.log_message(f"Async error for {bot_id}: {e}", "ERROR")
 
-                # Start in background thread to avoid blocking
-                thread = threading.Thread(target=run_async, daemon=True)
+                thread = threading.Thread(target=run_async, daemon=True, name=f"TelegramSignal-{bot_id}")
                 thread.start()
                 
-                # Update status
-                self.update_telegram_status(f"✅ {signal_type.upper()} signal sent to Telegram for bot: {bot_id}")
+                # ✅ UPDATE STATUS with bot identification
+                self.update_telegram_status(
+                    f"✅ {signal_type.upper()} signal sent to {len(chat_ids)} chat(s) for bot: {bot_id}"
+                )
 
             except Exception as e:
-                error_msg = f"Send telegram signal error: {e}"
-                self.update_telegram_status(error_msg)
+                error_msg = f"❌ Telegram signal error for {bot_id}: {e}"
                 self.log_message(error_msg, "ERROR")
+                self.update_telegram_status(error_msg)
 
         def format_open_position_signal(self, bot_id, symbol, order_type, volume, price, sl, tp, balance=None, equity=None, free_margin=None, margin_level=None):
             """Format open position signal message"""
@@ -4442,11 +4497,20 @@ This is a test message from Aventa HFT Pro 2026"""
                     return
                 
                 bot = self.bots[self.active_bot_id]
+                symbol = bot['config']['symbol']
+                enable_ml = bot['config'].get('enable_ml', False)
                 
                 # Check if bot has trained ML models
                 if bot.get('ml_predictor') and bot['ml_predictor'].is_trained:
                     ml = bot['ml_predictor']
-                    symbol = bot['config']['symbol']
+                    
+                    # Status based on enable_ml setting
+                    if enable_ml:
+                        ml_status_line = "🤖 ML Status:       ✅ ENABLED & TRAINED (Active)"
+                        ml_status_color = "#00e676"  # Green
+                    else:
+                        ml_status_line = "🤖 ML Status:       ⚠️  TRAINED but DISABLED"
+                        ml_status_color = "#ffb74d"  # Orange
                     
                     # ✅ FIX: Get training stats if available
                     metrics_text = ""
@@ -4477,16 +4541,18 @@ This is a test message from Aventa HFT Pro 2026"""
 
         🤖 Bot: {self.active_bot_id}
         📊 Symbol: {symbol}
+        {ml_status_line}
 
         {metrics_text}
-        Status: Ready for prediction!  ✅
+        {("✅ Ready for prediction!" if enable_ml else "⚠️  Enable ML in Control Panel to use predictions")}
 
         💡 This bot has its own trained models
         independent from other bots.
         """
                 else:
-                    symbol = bot['config']['symbol']
-                    status_text = f"""
+                    if enable_ml:
+                        # ML enabled but not trained
+                        status_text = f"""
         ╔══════════════════════════════════════╗
         ║   ML MODELS STATUS                   ║
         ╚══════════════════════════════════════╝
@@ -4494,12 +4560,45 @@ This is a test message from Aventa HFT Pro 2026"""
         🤖 Bot: {self.active_bot_id}
         📊 Symbol: {symbol}
 
-        ⚠️ No trained models for this bot
+        ⚠️  ML PREDICTION ENABLED BUT NOT TRAINED!
 
-        To train models:  
-        1.Click "🧠 Train Models"
-        2.Wait for training to complete
-        3.Click "💾 Save Models" (optional)
+        🚨 WARNING: All trading signals will be REJECTED
+           until the model is trained!
+
+        To train models immediately:  
+        1. Click "🧠 Train Models" button
+        2. Wait for training to complete
+        3. Models will be ready for trading
+
+        ⏰ Training typically takes 5-15 minutes
+           depending on data availability.
+
+        Each bot has independent ML models.
+        """
+                    else:
+                        # ML not enabled
+                        status_text = f"""
+        ╔══════════════════════════════════════╗
+        ║   ML MODELS STATUS                   ║
+        ╚══════════════════════════════════════╝
+
+        🤖 Bot: {self.active_bot_id}
+        📊 Symbol: {symbol}
+
+        ⚫ ML Prediction DISABLED
+
+        No trained models for this bot.
+
+        To enable ML Prediction:  
+        1. Go to 'Control Panel' tab
+        2. Check "Enable ML Predictions"
+        3. Go to 'ML Training' tab
+        4. Click "🧠 Train Models"
+        5. Wait for training to complete
+        6. Start trading
+
+        Note: When ML is enabled, ALL trading
+        decisions will be assisted by ML results!
 
         Each bot has independent ML models.
         """

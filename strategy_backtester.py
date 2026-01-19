@@ -125,6 +125,44 @@ class StrategyBacktester:
         except Exception as e:
             logger.error(f"Failed to get available symbols: {e}")
             return []
+    
+    def find_symbol_in_mt5(self, requested_symbol):
+        """
+        Find symbol in MT5 with case-insensitive and partial matching
+        Returns the actual symbol name in MT5 if found, otherwise None
+        """
+        try:
+            if mt5.terminal_info() is None:
+                if not mt5.initialize():
+                    return None
+            
+            available_symbols = self.get_available_symbols()
+            
+            if not available_symbols:
+                logger.warning("No symbols found in MT5")
+                return None
+            
+            # Exact match (case insensitive)
+            for sym in available_symbols:
+                if sym.upper() == requested_symbol.upper():
+                    logger.info(f"✓ Found exact match: {requested_symbol} → {sym}")
+                    return sym
+            
+            # Partial match (case insensitive) - match by main name
+            requested_upper = requested_symbol.upper().split('.')[0]  # Get base name (e.g., GOLD from GOLD.H1)
+            for sym in available_symbols:
+                sym_base = sym.upper().split('.')[0]
+                if sym_base == requested_upper:
+                    logger.info(f"✓ Found partial match: {requested_symbol} → {sym}")
+                    return sym
+            
+            logger.warning(f"Symbol {requested_symbol} not found in MT5")
+            logger.info(f"Available symbols (first 30): {', '.join(available_symbols[:30])}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding symbol: {e}")
+            return None
         
     def run_backtest(self, start_date, end_date, progress_callback=None, cancel_check=None):
         """Run backtest on historical data with ISOLATED MT5 connection"""
@@ -152,18 +190,21 @@ class StrategyBacktester:
             # ✅ GET SYMBOL INFO FIRST
             self._get_symbol_info()
 
-            symbol = self.config['symbol']
+            requested_symbol = self.config['symbol']
 
-            # ✅ VALIDATE SYMBOL AVAILABILITY - with detailed error info
-            if not mt5.symbol_select(symbol, True):
-                # Try to get available symbols for debugging
-                available = mt5.symbols_get()
-                available_names = [s.name for s in available[:10]] if available else []
+            # ✅ IMPROVED SYMBOL VALIDATION - Find symbol with case-insensitive matching
+            symbol = self.find_symbol_in_mt5(requested_symbol)
+            
+            if not symbol:
+                # Symbol not found even with fuzzy matching
+                available = self.get_available_symbols()
+                available_sample = ', '.join(available[:20]) if available else "None"
                 raise Exception(
-                    f"Symbol {symbol} not available in MT5 Terminal. "
-                    f"Available: {', '.join(available_names)}... "
-                    f"Please check Terminal and ensure symbol is available."
+                    f"Symbol '{requested_symbol}' not found in MT5. "
+                    f"Available (first 20): {available_sample}"
                 )
+            
+            logger.info(f"Using symbol from MT5: {symbol}")
 
             if progress_callback:
                 progress_callback(5, "Validating data availability...")

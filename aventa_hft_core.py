@@ -559,13 +559,31 @@ class UltraLowLatencyEngine:
             return np.nan, np.nan, np.nan, np.nan, np.nan
     
     def generate_signal(self, microstructure: Dict) -> Optional[Signal]:
-        """Generate trading signal based on microstructure analysis"""
+        """Generate trading signal based on microstructure analysis
+        
+        IMPORTANT: If ML Prediction is ENABLED, ALL signals MUST be assisted by ML results!
+        ML is mandatory when enable_ml=True, not optional.
+        """
         if not microstructure:
             return None
         
         current_tick = self.last_tick
         if current_tick is None:
             return None
+        
+        # ============================================
+        # CHECK IF ML IS ENABLED AND WARN IF NOT READY
+        # ============================================
+        enable_ml = self.config.get('enable_ml', False)
+        ml_ready = self.ml_predictor is not None and self.ml_predictor.is_trained
+        
+        if enable_ml and not ml_ready:
+            # ML is enabled but not ready - log warning once
+            if not hasattr(self, '_ml_not_ready_logged'):
+                logger.warning(f"⚠️  ML Prediction ENABLED but model NOT YET TRAINED!")
+                logger.warning(f"    Training is required before signals use ML assistance.")
+                logger.warning(f"    Please train the model first using the ML Training tab.")
+                self._ml_not_ready_logged = True
         
         # Signal generation parameters
         min_delta_threshold = self.config.get('min_delta_threshold', 100)
@@ -640,33 +658,54 @@ class UltraLowLatencyEngine:
             signal_strength *= 0.5
             reason.append("High volatility - reduced confidence")
         
-        # ML Prediction Enhancement
-        if self.ml_predictor and self.ml_predictor.is_trained:
-            try:
-                # Prepare features for ML prediction
-                features = self.ml_predictor.prepare_realtime_features(current_tick, microstructure)
-                ml_direction_num, ml_confidence = self.ml_predictor.predict(features)
-                
-                # Convert ML direction: 1 = BUY, 0/-1 = SELL
-                ml_direction = 'BUY' if ml_direction_num == 1 else 'SELL'
-                
-                # Enhance signal strength based on ML prediction
-                if signal_type and ml_direction == signal_type:
-                    # ML agrees with technical signal - boost confidence
-                    signal_strength = min(1.0, signal_strength + (ml_confidence * 0.3))
-                    reason.append(f"ML Enhanced: {ml_direction} confidence {ml_confidence:.2f}")
-                elif signal_type and ml_direction != signal_type:
-                    # ML disagrees - reduce confidence
-                    signal_strength *= (1.0 - ml_confidence * 0.2)
-                    reason.append(f"ML Conflict: Technical {signal_type} vs ML {ml_direction} ({ml_confidence:.2f})")
-                elif not signal_type and ml_confidence > 0.6:
-                    # No technical signal but strong ML signal
-                    signal_type = ml_direction
-                    signal_strength = ml_confidence * 0.7  # Scale down ML-only signals
-                    reason.append(f"ML Signal: {ml_direction} confidence {ml_confidence:.2f}")
+        # ============================================
+        # ML PREDICTION (MANDATORY IF enable_ml=True)
+        # ============================================
+        if enable_ml:
+            # ML is ENABLED - MUST use ML to assist decision
+            if ml_ready:
+                # Model is trained and ready
+                try:
+                    # Prepare features for ML prediction
+                    features = self.ml_predictor.prepare_realtime_features(current_tick, microstructure)
+                    ml_direction_num, ml_confidence = self.ml_predictor.predict(features)
                     
-            except Exception as e:
-                logger.warning(f"ML prediction error: {e}")
+                    # Convert ML direction: 1 = BUY, 0/-1 = SELL
+                    ml_direction = 'BUY' if ml_direction_num == 1 else 'SELL'
+                    
+                    # Enhance signal strength based on ML prediction
+                    if signal_type and ml_direction == signal_type:
+                        # ML agrees with technical signal - boost confidence significantly
+                        signal_strength = min(1.0, signal_strength + (ml_confidence * 0.4))
+                        reason.append(f"✅ ML AGREED: {ml_direction} confidence {ml_confidence:.2f}")
+                    elif signal_type and ml_direction != signal_type:
+                        # ML disagrees - reduce confidence significantly
+                        signal_strength *= (1.0 - ml_confidence * 0.4)
+                        reason.append(f"⚠️  ML DISAGREED: Technical {signal_type} vs ML {ml_direction} ({ml_confidence:.2f})")
+                    elif not signal_type and ml_confidence > 0.6:
+                        # No technical signal but strong ML signal - ACCEPT ML signal
+                        signal_type = ml_direction
+                        signal_strength = ml_confidence * 0.8  # ML-driven signal, use higher confidence
+                        reason.append(f"📊 ML SIGNAL ONLY: {ml_direction} confidence {ml_confidence:.2f}")
+                    else:
+                        # Weak technical signal or weak ML confidence
+                        reason.append(f"📊 ML analyzed: {ml_direction} ({ml_confidence:.2f}) - no override")
+                        
+                except Exception as e:
+                    logger.error(f"❌ ML prediction ERROR: {e}")
+                    reason.append(f"ML ERROR: {str(e)}")
+            else:
+                # ML enabled but model not trained - reject signal with warning
+                reason.append("⚠️  ML ENABLED but MODEL NOT TRAINED - signal rejected")
+                # Return None to reject all signals until ML is trained
+                if not hasattr(self, '_ml_training_required_logged'):
+                    logger.error(f"🚨 SIGNAL REJECTION: ML enabled but model not trained!")
+                    logger.error(f"   Please train ML model first via ML Training tab!")
+                    self._ml_training_required_logged = True
+                return None
+        else:
+            # ML is not enabled - use technical signals only
+            reason.append("ML Prediction DISABLED")
         
         # Check if we should close position
         if self.position_type is not None:
