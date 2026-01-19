@@ -1,5 +1,5 @@
 """
-Live Test - BTCUSD Weekend Trading
+Live Test - XAUUSD Weekend Trading
 Monitor performance in real market conditions
 """
 

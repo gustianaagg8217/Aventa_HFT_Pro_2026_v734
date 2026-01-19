@@ -117,7 +117,7 @@ Edit `configs/Bot_5_config.json` untuk mengatur parameter trading:
 ```json
 {
     "bot_id": "Bot_5",
-    "symbol": "BTCUSD.futu",
+    "symbol": "XAUUSD.futu",
     "default_volume": 0.01,
     "magic_number": 2026005,
     "risk_per_trade": 1.0,
@@ -144,7 +144,7 @@ Edit `configs/Bot_5_config.json` untuk mengatur parameter trading:
 
 | Parameter | Deskripsi | Default |
 |-----------|-----------|---------|
-| `symbol` | Simbol trading | BTCUSD.futu |
+| `symbol` | Simbol trading | XAUUSD.futu |
 | `default_volume` | Volume per trade | 0.01 |
 | `max_positions` | Max posisi terbuka | 5 |
 | `max_floating_loss` | Max loss floating | $5.00 |
@@ -220,7 +220,7 @@ The system uses **daily drawdown calculation** based on the daily peak equity, n
 #### **🔵 OPEN POSITION SIGNAL**
 ```
 🤖 Bot: Bot_5
-📊 Symbol: BTCUSD.futu
+📊 Symbol: XAUUSD.futu
 📈 Order Type: BUY
 📦 Volume: 0.01
 💰 Price: $95121.59
@@ -234,7 +234,7 @@ The system uses **daily drawdown calculation** based on the daily peak equity, n
 #### **🔴 CLOSE POSITION SIGNAL**
 ```
 🤖 Bot: Bot_5
-📊 Symbol: BTCUSD.futu
+📊 Symbol: XAUUSD.futu
 🎫 Ticket: 36185049
 💰 Profit: $0.15
 📦 Volume: 0.01
@@ -368,7 +368,7 @@ WARNING - High memory usage detected
 #### **UltraLowLatencyEngine**
 ```python
 engine = UltraLowLatencyEngine(
-    symbol="BTCUSD.futu",
+    symbol="XAUUSD.futu",
     config=config_dict,
     risk_manager=risk_manager,
     ml_predictor=ml_predictor,

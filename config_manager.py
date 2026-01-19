@@ -62,13 +62,13 @@ class ConfigManager:
         self.config_dir = config_dir
         os.makedirs(config_dir, exist_ok=True)
     
-    def create_isolated_config(self, base_config:  Dict = None, bot_id: str = None) -> Dict:
+    def create_isolated_config(self, base_config: Dict = None, bot_id: str = None) -> Dict:
         """
-        Create a completely isolated config (deep copy)
+        Create an isolated deep copy of configuration
         
-        Args:  
-            base_config: Base configuration to copy from (or use DEFAULT_CONFIG)
-            bot_id: Bot identifier (will increment magic number)
+        Args:
+            base_config: Config to copy (default: DEFAULT_CONFIG)
+            bot_id: Bot identifier for isolation tracking
         
         Returns:
             Deep copied configuration
@@ -76,28 +76,15 @@ class ConfigManager:
         if base_config is None:
             base_config = self.DEFAULT_CONFIG
         
-        # CRITICAL: Deep copy to prevent shared references
-        config = copy.deepcopy(base_config)
+        # CRITICAL: Deep copy for complete isolation
+        isolated = copy.deepcopy(base_config)
         
-        # ✅ FIX: Generate unique magic number WITHOUT hash collisions
-        if bot_id:  
-            # Extract numeric suffix from bot_id (e.g., "Bot_5" -> 5)
-            import re
-            match = re.search(r'_(\d+)$', bot_id)
-            if match:
-                bot_num = int(match.group(1))
-                config['magic_number'] = 2026000 + bot_num
-            else:
-                # Fallback:  Use length-based offset if no number found
-                config['magic_number'] = 2026000 + len(bot_id)
+        # Add isolation metadata
+        if bot_id:
+            isolated['bot_id'] = bot_id
         
-        # Add metadata
-        config['_created_at'] = datetime.now().isoformat()
-        config['_bot_id'] = bot_id
-        
-        logger.info(f"Created isolated config for {bot_id} (magic: {config['magic_number']})")
-        
-        return config
+        logger.info(f"Created isolated config for {bot_id or 'new bot'}: {isolated.get('symbol', 'UNKNOWN')}")
+        return isolated
     
     def validate_config(self, config: Dict) -> bool:
         """
@@ -222,8 +209,10 @@ if __name__ == "__main__":
     manager = ConfigManager()
     
     # Create two isolated configs
-    config1 = manager.create_isolated_config(bot_id="Bot_1")
-    config2 = manager.create_isolated_config(bot_id="Bot_2")
+    config1 = copy.deepcopy(ConfigManager.DEFAULT_CONFIG)
+    config1['bot_id'] = "Bot_1"
+    config2 = copy.deepcopy(ConfigManager.DEFAULT_CONFIG)
+    config2['bot_id'] = "Bot_2"
     
     # Modify config1
     config1['symbol'] = 'EURUSD'

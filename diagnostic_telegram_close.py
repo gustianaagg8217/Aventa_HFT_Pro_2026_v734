@@ -95,7 +95,7 @@ def diagnostic_telegram_close():
                 gui.send_telegram_signal(
                     bot_id=gui.active_bot_id,
                     signal_type='close_position',
-                    symbol='BTCUSD',
+                    symbol='XAUUSD',
                     ticket='12345678',
                     profit=15.50,
                     volume=0.01,

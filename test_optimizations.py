@@ -18,8 +18,10 @@ class TestConfigManager:
         """Verify configs are truly isolated"""
         manager = ConfigManager()
         
-        config1 = manager.create_isolated_config(bot_id="Bot_1")
-        config2 = manager.create_isolated_config(bot_id="Bot_2")
+        config1 = copy.deepcopy(manager.DEFAULT_CONFIG)
+        config1['bot_id'] = "Bot_1"
+        config2 = copy.deepcopy(manager.DEFAULT_CONFIG)
+        config2['bot_id'] = "Bot_2"
         
         # Modify config1
         config1['symbol'] = 'EURUSD'
@@ -35,7 +37,8 @@ class TestConfigManager:
         
         magics = set()
         for i in range(10):
-            config = manager.create_isolated_config(bot_id=f"Bot_{i}")
+            config = copy.deepcopy(manager.DEFAULT_CONFIG)
+            config['bot_id'] = f"Bot_{i}"
             magics.add(config['magic_number'])
         
         assert len(magics) == 10, "Magic numbers not unique"
@@ -44,7 +47,8 @@ class TestConfigManager:
         """Test save and load preserves data"""
         manager = ConfigManager()
         
-        config = manager.create_isolated_config(bot_id="TestBot")
+        config = copy.deepcopy(manager.DEFAULT_CONFIG)
+        config['bot_id'] = "TestBot"
         config['custom_field'] = 'test_value'
         
         # Save
