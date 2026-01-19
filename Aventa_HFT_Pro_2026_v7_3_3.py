@@ -1484,23 +1484,29 @@ class HFTProGUI:
                 self.log_message(f"Stop trading error:   {e}", "ERROR")
 
         def add_bot(self, default=False):
-            """Add a new bot instance with independent config"""
+            """Add a new bot instance with independent config and unique magic number"""
             try:
-                # Generate default name (only if not loading from session)
+                # Generate default name
                 bot_id = f"Bot_{len(self.bots) + 1}"
                 
-                # ✅ USE ConfigManager for isolation
-                config = self.config_manager.create_isolated_config(
-                    base_config=self.get_config_from_gui(),
+                # ✅ CRITICAL FIX: Use DEFAULT config (NOT current GUI config!)
+                # New bot should start with default settings, not copy from previous bot
+                default_config = self.config_manager.create_isolated_config(
+                    base_config=None,  # ← Use DEFAULT_CONFIG, not GUI config!
                     bot_id=bot_id
                 )
                 
+                # ✅ AUTO-INCREMENT MAGIC NUMBER (CRITICAL FIX!)
+                # Each bot needs unique magic number
+                next_magic = 2026000 + len(self.bots) + 1
+                default_config['magic_number'] = next_magic
+                
                 # Verify isolation
-                if not self.config_manager.validate_config(config):
+                if not self.config_manager.validate_config(default_config):
                     raise ValueError("Invalid config generated")
                 
                 self.bots[bot_id] = {
-                    'config': config,  # Already deep copied
+                    'config': default_config,  # Deep copied with default values
                     'engine': None,
                     'risk_manager': None,
                     'ml_predictor': None,
@@ -1518,7 +1524,7 @@ class HFTProGUI:
                     self.load_bot_config_to_gui(bot_id)
                     self.update_button_states()
                 
-                self.log_message(f"✓ {bot_id} added successfully", "SUCCESS")
+                self.log_message(f"✓ {bot_id} added successfully (Magic: {next_magic})", "SUCCESS")
                 
                 # Update Telegram bot selector if Telegram tab is already built
                 try:
