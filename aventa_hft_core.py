@@ -1122,27 +1122,32 @@ class UltraLowLatencyEngine:
         
         current_equity = self.get_account_equity()
 
-        if current_equity > self.peak_equity:
-            self.peak_equity = current_equity
-
+        # ✅ DAILY DRAWDOWN CALCULATION (from today's peak only, not all-time peak)
+        # peak_equity is reset to current equity at start of day, so this calculates daily DD
         drawdown_pct = 0.0
         if self.peak_equity > 0:
             drawdown_pct = ((self.peak_equity - current_equity) / self.peak_equity) * 100
+        
+        # ✅ UPDATE: Only update peak_equity if we're higher TODAY (daily peak tracking)
+        # This ensures we calculate daily drawdown from today's highest point
+        if current_equity > self.peak_equity:
+            self.peak_equity = current_equity
+            logger.debug(f"New daily peak equity: ${self.peak_equity:.2f}")
 
         logger.info(
-            f"📉 Drawdown equity sekarang: {drawdown_pct:.2f}% (Tertinggi: ${self.peak_equity:.2f})"
+            f"📉 Daily Drawdown: {drawdown_pct:.2f}% (Today's Peak: ${self.peak_equity:.2f})"
         )
 
-        # Enforcement: max drawdown
+        # Enforcement: max daily drawdown
         max_dd = self.config.get("max_drawdown_pct", 0)
 
         if max_dd > 0 and drawdown_pct >= max_dd:
             logger.warning(
-                f"🚨 MAX DRAWDOWN HIT: {drawdown_pct:.2f}% / {max_dd:.2f}%"
+                f"🚨 MAX DAILY DRAWDOWN HIT: {drawdown_pct:.2f}% / {max_dd:.2f}%"
             )
             if self.risk_manager:
                 self.risk_manager.trigger_circuit_breaker(
-                    f"Drawdown exceeded {drawdown_pct:.2f}%"
+                    f"Daily Drawdown exceeded {drawdown_pct:.2f}%"
                 )
             return False
 

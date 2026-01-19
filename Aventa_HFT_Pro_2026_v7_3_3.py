@@ -2852,7 +2852,7 @@ class HFTProGUI:
                         
                         # ✅ OVERRIDE CRITICAL PARAMS FROM GUI (ALWAYS!)
                         config['symbol'] = symbol  # ← MUST use GUI symbol!  
-                        self.root.after(0, lambda: self.add_bt_log(f"✓ Symbol override: {symbol}", "INFO"))
+                        self.root.after(0, lambda: self.add_bt_log(f"✓ Symbol: {symbol}", "INFO"))
                         self.root.after(0, lambda: self.add_bt_log(f"✓ Initial balance: ${initial_balance:,.2f}", "INFO"))
 
                         # Import backtester
@@ -2863,7 +2863,20 @@ class HFTProGUI:
                         
                         # ✅ CREATE BACKTESTER WITH ISOLATED BALANCE
                         self.root.after(0, lambda: self.add_bt_log("✓ Backtester initialized", "SUCCESS"))
-                        backtester = StrategyBacktester(config, initial_balance)  # ← CRITICAL!  
+                        backtester = StrategyBacktester(config, initial_balance)  # ← CRITICAL!
+                        
+                        # ✅ CHECK SYMBOL AVAILABILITY BEFORE BACKTEST
+                        self.root.after(0, lambda: self.add_bt_log(f"🔍 Checking symbol availability...", "INFO"))
+                        available_symbols = backtester.get_available_symbols()
+                        
+                        if symbol not in available_symbols:
+                            self.root.after(0, lambda: self.add_bt_log(f"❌ Symbol {symbol} NOT FOUND in MT5", "ERROR"))
+                            self.root.after(0, lambda: self.add_bt_log(f"Available symbols (first 20): {', '.join(available_symbols[:20])}", "INFO"))
+                            self.root.after(0, lambda: self.add_bt_log("Please check Terminal and ensure symbol is available.", "ERROR"))
+                            self.root.after(0, lambda: self.bt_progress_label.set("Symbol not available"))
+                            return
+                        
+                        self.root.after(0, lambda: self.add_bt_log(f"✓ Symbol {symbol} is available", "SUCCESS"))
                         
                         # Run backtest with progress tracking
                         self.root.after(0, lambda: self.add_bt_log("⏳ Running backtest simulation...", "INFO"))

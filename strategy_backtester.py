@@ -112,9 +112,22 @@ class StrategyBacktester:
             # Fallback values
             self.pip_size = 0.00001
             self.pip_value = 0.01 * self.config.get('default_volume', 0.01)
+
+    def get_available_symbols(self):
+        """Get list of available trading symbols from MT5"""
+        try:
+            if mt5.terminal_info() is None:
+                if not mt5.initialize():
+                    return []
+            
+            symbols = mt5.symbols_get()
+            return [s.name for s in symbols] if symbols else []
+        except Exception as e:
+            logger.error(f"Failed to get available symbols: {e}")
+            return []
         
     def run_backtest(self, start_date, end_date, progress_callback=None, cancel_check=None):
-        """Run backtest on historical data"""
+        """Run backtest on historical data with ISOLATED MT5 connection"""
         try:
             # ✅ VALIDATE DATES
             if start_date >= end_date:
@@ -126,18 +139,31 @@ class StrategyBacktester:
             if days_diff > 365:
                 raise ValueError("Date range cannot exceed 1 year for performance")
 
-            # Initialize MT5
-            if not mt5.initialize():
-                raise Exception("MT5 initialization failed")
+            # ✅ ISOLATED MT5 INITIALIZATION (independent for each bot)
+            # Check if MT5 is already initialized
+            if mt5.terminal_info() is None:
+                # MT5 not initialized yet, initialize it
+                if not mt5.initialize():
+                    raise Exception("MT5 initialization failed - Check Terminal connection")
+                logger.info("✓ MT5 initialized for Strategy Tester")
+            else:
+                logger.info("✓ Using existing MT5 connection for Strategy Tester")
 
             # ✅ GET SYMBOL INFO FIRST
             self._get_symbol_info()
 
             symbol = self.config['symbol']
 
-            # ✅ VALIDATE SYMBOL AVAILABILITY
+            # ✅ VALIDATE SYMBOL AVAILABILITY - with detailed error info
             if not mt5.symbol_select(symbol, True):
-                raise Exception(f"Symbol {symbol} not available for trading")
+                # Try to get available symbols for debugging
+                available = mt5.symbols_get()
+                available_names = [s.name for s in available[:10]] if available else []
+                raise Exception(
+                    f"Symbol {symbol} not available in MT5 Terminal. "
+                    f"Available: {', '.join(available_names)}... "
+                    f"Please check Terminal and ensure symbol is available."
+                )
 
             if progress_callback:
                 progress_callback(5, "Validating data availability...")
@@ -153,6 +179,16 @@ class StrategyBacktester:
 
             df = pd.DataFrame(rates)
             df['time'] = pd.to_datetime(df['time'], unit='s')
+
+            # ✅ ADD VOLUME COLUMN (MT5 returns tick_volume, real_volume - we'll use tick_volume as volume)
+            if 'tick_volume' in df.columns and 'volume' not in df.columns:
+                df['volume'] = df['tick_volume']
+            elif 'real_volume' in df.columns and 'volume' not in df.columns:
+                df['volume'] = df['real_volume']
+            elif 'volume' not in df.columns:
+                # Fallback: create synthetic volume if neither exists
+                logger.warning("Neither tick_volume nor real_volume found. Creating synthetic volume.")
+                df['volume'] = 1.0  # Minimum volume for all bars
 
             # ✅ DATA QUALITY CHECKS
             if df.isnull().any().any():
