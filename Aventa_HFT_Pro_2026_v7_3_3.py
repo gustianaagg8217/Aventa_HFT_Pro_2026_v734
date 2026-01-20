@@ -2402,13 +2402,36 @@ class HFTProGUI:
         def build_strategy_tab(self):
             """Build comprehensive Strategy Tester tab"""
             try:  
-                # Main container
-                main_container = ttk.Frame(self.strategy_tab)
-                main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+                # Create Canvas with scrollbar for entire tab
+                canvas = tk.Canvas(self.strategy_tab, bg='#1a1e3a', highlightthickness=0)
+                scrollbar = ttk.Scrollbar(self.strategy_tab, orient=tk.VERTICAL, command=canvas.yview)
+                
+                canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+                scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+                
+                canvas.configure(yscrollcommand=scrollbar.set)
+                
+                # Main container inside canvas
+                main_container = ttk.Frame(canvas)
+                canvas_window = canvas.create_window((0, 0), window=main_container, anchor='nw')
+                
+                # Update scroll region when frame changes
+                def on_frame_configure(event=None):
+                    canvas.configure(scrollregion=canvas.bbox('all'))
+                    # Make canvas window width match canvas width
+                    canvas.itemconfig(canvas_window, width=canvas.winfo_width())
+                
+                main_container.bind('<Configure>', on_frame_configure)
+                canvas.bind('<Configure>', lambda e: canvas.itemconfig(canvas_window, width=e.width))
+                
+                # Enable mousewheel scrolling
+                def on_mousewheel(event):
+                    canvas.yview_scroll(int(-1*(event.delta/120)), 'units')
+                canvas.bind_all('<MouseWheel>', on_mousewheel)
 
                 # === BACKTEST CONFIGURATION ===
                 config_frame = ttk.LabelFrame(main_container, text="⚙️ Backtest Configuration", padding=10)
-                config_frame.pack(fill=tk.X, pady=(0, 10))
+                config_frame.pack(fill=tk.X, pady=(0, 10), padx=10)
 
                 # Row 1: Date Range
                 date_row = ttk.Frame(config_frame)
@@ -2462,6 +2485,9 @@ class HFTProGUI:
                 
                 ttk.Button(control_row, text="📁 Export Trades CSV", 
                         command=self.export_trades_csv, width=18).pack(side=tk.LEFT, padx=5)
+                
+                ttk.Button(control_row, text="🔄 Convert CSV2Excel", 
+                        command=self.launch_csv_converter, width=18).pack(side=tk.LEFT, padx=5)
 
                 # Progress Bar
                 progress_frame = ttk.Frame(config_frame)
@@ -2607,13 +2633,16 @@ class HFTProGUI:
                 self.bt_trades_tree.column('ML Conf', width=70, anchor=tk.CENTER)
                 self.bt_trades_tree.column('Duration', width=100, anchor=tk.CENTER)
 
-                # Pack treeview and scrollbars
-                self.bt_trades_tree.grid(row=0, column=0, sticky='nsew')
-                tree_scroll_y.grid(row=0, column=1, sticky='ns')
-                tree_scroll_x.grid(row=1, column=0, sticky='ew')
+                # Pack treeview and scrollbars using grid
+                self.bt_trades_tree.grid(row=0, column=0, sticky='nsew', padx=(0, 2), pady=(0, 2))
+                tree_scroll_y.grid(row=0, column=1, sticky='ns', padx=(0, 0), pady=(0, 2))
+                tree_scroll_x.grid(row=1, column=0, sticky='ew', padx=(0, 2), pady=(0, 0))
                 
+                # Configure grid weights for proper resizing
                 tree_container.grid_rowconfigure(0, weight=1)
+                tree_container.grid_rowconfigure(1, weight=0)
                 tree_container.grid_columnconfigure(0, weight=1)
+                tree_container.grid_columnconfigure(1, weight=0)
 
                 # Configure row colors
                 self.bt_trades_tree.tag_configure('profit', background='#1a4d2e', foreground='#00e676')
@@ -2842,6 +2871,26 @@ class HFTProGUI:
                 self.add_bt_log("⚠️ Cancelling backtest...", "WARNING")
             except Exception as e:
                 self.log_message(f"Cancel backtest error: {e}", "ERROR")
+
+        def launch_csv_converter(self):
+            """Launch CSV to Excel Converter GUI"""
+            try:
+                import subprocess
+                import os
+                
+                converter_path = os.path.join(os.path.dirname(__file__), "csv_to_excel_converter_gui.py")
+                
+                if not os.path.exists(converter_path):
+                    messagebox.showerror("Error", f"Converter not found: {converter_path}")
+                    return
+                
+                # Launch in separate process
+                subprocess.Popen(["python", converter_path])
+                self.log_message("✓ CSV to Excel Converter launched", "INFO")
+                
+            except Exception as e:
+                self.log_message(f"Launch converter error: {e}", "ERROR")
+                messagebox.showerror("Error", f"Failed to launch converter:\n{e}")
 
         def export_backtest_results(self):
             """Export backtest results to JSON"""

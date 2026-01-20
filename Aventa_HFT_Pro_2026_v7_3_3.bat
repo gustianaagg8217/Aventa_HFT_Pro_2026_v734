@@ -88,5 +88,5 @@ start "TELEGRAM_BOT" cmd /k python start_telegram_bot_manual.py
 echo.
 echo ============================================================
 echo [INFO] Semua service sudah dijalankan
-echo Jangan tutup window ini jika masih dibutuhkan
-pause
+echo Windows ini akan Close otomatis
+exit
