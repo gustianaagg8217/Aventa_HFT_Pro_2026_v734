@@ -2966,7 +2966,7 @@ class HFTProGUI:
                 import subprocess
                 import os
                 
-                converter_path = os.path.join(os.path.dirname(__file__), "csv_to_excel_converter_gui.py")
+                converter_path = os.path.join(os.path.dirname(__file__), "csv_to_excel_converter_gui.exe")
                 
                 if not os.path.exists(converter_path):
                     messagebox.showerror("Error", f"Converter not found: {converter_path}")
