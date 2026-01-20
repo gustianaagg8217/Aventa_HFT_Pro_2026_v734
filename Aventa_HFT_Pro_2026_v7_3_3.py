@@ -596,7 +596,7 @@ class HFTProGUI:
             self.tp_dollar_var = tk.StringVar(value="0.8")
             self.max_floating_loss_var = tk.StringVar(value="5")
             self.max_floating_profit_var = tk.StringVar(value="0.5")
-            self.mt5_path_var = tk.StringVar(value="C:\\Program Files\\XM Global MT5\\terminal64.exe")
+            self.mt5_path_var = tk.StringVar(value="C:\\Program Files\\MT5\\terminal64.exe")
             self.enable_ml_var = tk.BooleanVar(value=False)
             # Commission Configuration (TAMBAHKAN INI)
             self.commission_var = tk.StringVar(value="0.9")  # Default $0.90 per trade
@@ -1472,7 +1472,7 @@ class HFTProGUI:
                 self.tp_dollar_var.set(config.get('tp_dollar_amount', '0.8'))
                 self.max_floating_loss_var.set(config.get('max_floating_loss', '5'))
                 self.max_floating_profit_var.set(config.get('max_floating_profit', '0.5'))
-                self.mt5_path_var.set(config.get('mt5_path', 'C:\\Program Files\\XM Global MT5\\terminal64.exe'))
+                self.mt5_path_var.set(config.get('mt5_path', 'C:\\Program Files\\MT5\\terminal64.exe'))
                 self.enable_ml_var.set(config.get('use_ml', False))
                 # ✅ ADD COMMISSION
                 self.commission_var.set(config.get('commission_per_trade', '0.9'))
@@ -2000,7 +2000,7 @@ class HFTProGUI:
                 'tp_dollar_amount': 0.8,
                 'max_floating_loss': 5.0,
                 'max_floating_profit': 0.5,
-                'mt5_path':  'C:\\Program Files\\XM Global MT5\\terminal64.exe',
+                'mt5_path':  'C:\\Program Files\\MT5\\terminal64.exe',
                 'enable_ml': False,
                 # ✅ ADD COMMISSION
                 'commission_per_trade': 0.9,  # Default $0.90 per trade
@@ -2114,7 +2114,7 @@ class HFTProGUI:
                 self.max_floating_profit_var.set(str(config.get('max_floating_profit', 0.5)))
                 
                 # ✅ FIX: MT5 PATH - INI YANG PALING PENTING!
-                self.mt5_path_var.set(config.get('mt5_path', 'C:\\Program Files\\XM Global MT5\\terminal64.exe'))
+                self.mt5_path_var.set(config.get('mt5_path', 'C:\\Program Files\\MT5\\terminal64.exe'))
                 
                 self.enable_ml_var.set(config.get('enable_ml', False))
                 self.commission_var.set(str(config.get('commission_per_trade', 0.9)))
