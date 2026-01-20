@@ -376,8 +376,21 @@ class RiskManager:
         return None
     
     def get_risk_metrics(self, account_balance: float, mt5_positions=None) -> RiskMetrics:
-        """Calculate comprehensive risk metrics"""
+        """
+        Calculate comprehensive risk metrics
         
+        Drawdown Formula:
+        Current Drawdown = (Floating Loss / Initial Balance) * 100
+        Where:
+            - Floating Loss = Peak Balance - Current Balance
+            - Initial Balance = Starting balance at day beginning
+            
+        Example:
+            - Peak Balance: $1000
+            - Current Balance: $980  
+            - Floating Loss: $1000 - $980 = $20
+            - Current Drawdown: ($20 / $1000) * 100 = 2.0%
+        """
         # Update daily peak balance for drawdown calculation
         if self.peak_balance == 0.0:
             # Initialize peak balance at start of day
@@ -387,8 +400,19 @@ class RiskManager:
             self.peak_balance = account_balance
         
         # Calculate daily drawdown based on account balance
+        # Formula: Current Drawdown = (Floating - Balance) / Balance * 100
+        # Where: Floating = Equity - Balance (floating profit/loss)
+        # And: Balance = account balance
         if self.peak_balance > 0:
-            self.current_drawdown = ((self.peak_balance - account_balance) / self.peak_balance) * 100
+            # Floating P&L = current equity - balance
+            # When equity drops below balance, floating becomes negative (drawdown)
+            floating_pnl = (self.peak_balance - account_balance)  # Loss from peak
+            
+            # Drawdown percentage = Floating Loss / Peak Balance * 100
+            self.current_drawdown = (floating_pnl / self.peak_balance) * 100
+            
+            # Ensure drawdown is never negative (can't have positive drawdown)
+            self.current_drawdown = max(0.0, self.current_drawdown)
         else:
             self.current_drawdown = 0.0
         

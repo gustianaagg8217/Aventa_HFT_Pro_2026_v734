@@ -1715,11 +1715,12 @@ class UltraLowLatencyEngine:
         }
     
     def get_performance_snapshot(self):
-        """Get bot-specific performance snapshot"""
+        """Get bot-specific performance snapshot with ACTUAL MT5 floating P&L"""
         
-        # ✅ CALCULATE BOT-SPECIFIC WIN RATE
-        total_trades = self.bot_wins + self.bot_losses
-        win_rate = (self.bot_wins / total_trades * 100) if total_trades > 0 else 0.0
+        # ✅ GET TODAY'S STATS INCLUDING ACTUAL FLOATING P&L
+        trades_today, bot_wins, bot_losses, daily_pnl_actual = self.get_today_trade_stats()
+        total_trades = bot_wins + bot_losses
+        win_rate = (bot_wins / total_trades * 100) if total_trades > 0 else 0.0
         
         # ✅ GET ONLY THIS BOT'S POSITIONS
         magic = self.config.get('magic_number', 2026002)
@@ -1756,12 +1757,12 @@ class UltraLowLatencyEngine:
             bot_drawdown = ((self.bot_peak_balance - bot_equity) / self.bot_peak_balance) * 100
 
         return {
-            # ✅ BOT-SPECIFIC TRADING STATS
-            "trades_today": self.bot_trades_today,
-            "wins":  self.bot_wins,
-            "losses": self.bot_losses,
+            # ✅ BOT-SPECIFIC TRADING STATS WITH ACTUAL FLOATING P&L
+            "trades_today": trades_today,
+            "wins":  bot_wins,
+            "losses": bot_losses,
             "win_rate": win_rate,
-            "daily_pnl": self.bot_daily_pnl,
+            "daily_pnl": daily_pnl_actual,  # ✅ NOW INCLUDES FLOATING FROM OPEN POSITIONS
             "current_position": bot_position_type,
             "position_volume": bot_position_volume,
             
@@ -1886,6 +1887,12 @@ class UltraLowLatencyEngine:
         return total_volume
 
     def get_today_trade_stats(self):
+        """
+        Calculate today's trading statistics including ACTUAL floating P&L
+        
+        Daily P&L = Realized P&L (closed trades) + Unrealized P&L (floating from open positions)
+        This ensures Daily P&L reflects ACTUAL MT5 floating actual, not just accumulated trades
+        """
         from datetime import datetime, time, timezone
         import pytz
 
@@ -1906,29 +1913,44 @@ class UltraLowLatencyEngine:
 
         deals = mt5.history_deals_get(day_start_server, now_server)
         if not deals:
-            return 0, 0, 0, 0.0
+            # Still need to calculate floating from open positions even if no closed trades
+            realized_pnl = 0.0
+        else:
+            realized_pnl = 0.0
 
         trades = 0
         wins = 0
         losses = 0
-        pnl = 0.0
 
         magic = self.config.get('magic_number', 2026002)
 
-        for d in deals:
-            # ✅ FILTER BY MAGIC NUMBER - only count this bot's trades
-            if d.magic != magic:
-                continue
-                
-            pnl += d.profit
-            if d.entry == mt5.DEAL_ENTRY_IN:
-                trades += 1
-            if d.profit > 0:
-                wins += 1
-            elif d.profit < 0:
-                losses += 1
+        if deals:
+            for d in deals:
+                # ✅ FILTER BY MAGIC NUMBER - only count this bot's trades
+                if d.magic != magic:
+                    continue
+                    
+                realized_pnl += d.profit
+                if d.entry == mt5.DEAL_ENTRY_IN:
+                    trades += 1
+                if d.profit > 0:
+                    wins += 1
+                elif d.profit < 0:
+                    losses += 1
 
-        return trades, wins, losses, pnl
+        # ✅ GET CURRENT FLOATING P&L FROM OPEN POSITIONS
+        # This ensures Daily P&L reflects ACTUAL floating actual from MT5
+        floating_pnl = 0.0
+        positions = mt5.positions_get(symbol=self.symbol)
+        if positions:
+            for pos in positions:
+                if pos.magic == magic:  # Only this bot's positions
+                    floating_pnl += pos.profit
+        
+        # ✅ TOTAL DAILY P&L = Realized (closed trades) + Unrealized (floating from open positions)
+        total_daily_pnl = realized_pnl + floating_pnl
+
+        return trades, wins, losses, total_daily_pnl
 
     def get_total_position_volume(self):
         positions = mt5.positions_get(symbol=self.symbol)

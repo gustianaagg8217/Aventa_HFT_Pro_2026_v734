@@ -131,6 +131,66 @@ class TextWidgetLogger:
         pass
 
 
+class Tooltip:
+    """Create a tooltip for a given widget"""
+    def __init__(self, widget, text="", delay=500):
+        self.widget = widget
+        self.text = text
+        self.delay = delay
+        self.tipwindow = None
+        self.id = None
+        self.x = self.y = 0
+        
+        # Bind events
+        self.widget.bind("<Enter>", self.enter, add=True)
+        self.widget.bind("<Leave>", self.leave, add=True)
+        self.widget.bind("<ButtonPress>", self.leave, add=True)
+    
+    def enter(self, event=None):
+        """Show tooltip on mouse enter"""
+        self.schedule()
+    
+    def leave(self, event=None):
+        """Hide tooltip on mouse leave or click"""
+        self.unschedule()
+        self.hidetip()
+    
+    def schedule(self):
+        """Schedule tooltip to appear"""
+        self.unschedule()
+        self.id = self.widget.after(self.delay, self.showtip)
+    
+    def unschedule(self):
+        """Cancel scheduled tooltip"""
+        if self.id:
+            self.widget.after_cancel(self.id)
+            self.id = None
+    
+    def showtip(self):
+        """Show the tooltip"""
+        if self.tipwindow or not self.text:
+            return
+        
+        x = self.widget.winfo_rootx() + 10
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        
+        # Style the tooltip
+        label = tk.Label(tw, text=self.text, background="#FFE4B5", 
+                        relief=tk.SOLID, borderwidth=1, font=("Arial", 9),
+                        padx=5, pady=3)
+        label.pack(ipadx=1)
+    
+    def hidetip(self):
+        """Hide the tooltip"""
+        if self.tipwindow:
+            self.tipwindow.destroy()
+            self.tipwindow = None
+
+
 class HFTProGUI:
         def start_all_bots(self):
             """Start trading for all bots"""
@@ -632,8 +692,13 @@ class HFTProGUI:
             # Row 1
             btn_row1 = ttk.Frame(btn_frame)
             btn_row1.pack(fill=tk.X, pady=2)
-            ttk.Button(btn_row1, text="➕ Add", command=self.add_bot, width=10).pack(side=tk.LEFT, padx=2)
-            ttk.Button(btn_row1, text="🗑️ Remove", command=self.remove_bot, width=13).pack(side=tk.LEFT, padx=2)
+            add_btn = ttk.Button(btn_row1, text="➕ Add", command=self.on_add_bot_disabled, width=10)
+            add_btn.pack(side=tk.LEFT, padx=2)
+            Tooltip(add_btn, "Silahkan hubungi CS kami")
+            
+            remove_btn = ttk.Button(btn_row1, text="🗑️ Remove", command=self.on_remove_bot_disabled, width=13)
+            remove_btn.pack(side=tk.LEFT, padx=2)
+            Tooltip(remove_btn, "Silahkan hubungi CS kami")
 
             # Row 2 - RENAME button
             btn_row2 = ttk.Frame(btn_frame)
@@ -1613,6 +1678,14 @@ class HFTProGUI:
                 
             except Exception as e:
                 self.log_message(f"Stop trading error:   {e}", "ERROR")
+
+        def on_add_bot_disabled(self):
+            """Show notification when Add button is clicked (disabled)"""
+            messagebox.showinfo("Fitur Tidak Tersedia", "Silahkan hubungi CS kami")
+
+        def on_remove_bot_disabled(self):
+            """Show notification when Remove button is clicked (disabled)"""
+            messagebox.showinfo("Fitur Tidak Tersedia", "Silahkan hubungi CS kami")
 
         def add_bot(self, default=False):
             """Add a new bot instance with independent config and unique magic number"""
