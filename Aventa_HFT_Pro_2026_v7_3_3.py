@@ -132,51 +132,59 @@ class HFTProGUI:
                 with open('hft_session.json', 'r') as f:
                     session_data = json.load(f)
                 
-                # Clear current bots
-                self.bots.clear()
-                self.bot_listbox.delete(0, tk.END)
-                
-                # Restore bots
+                # ✅ Load data into memory first (safe to do in thread)
+                loaded_bots = {}
                 for bot_id, bot_data in session_data.get('bots', {}).items():
-                    self.bots[bot_id] = {
-                        'config': copy.deepcopy(bot_data['config']),  # ✅ Deep copy
+                    loaded_bots[bot_id] = {
+                        'config': copy.deepcopy(bot_data['config']),
                         'engine': None,
                         'risk_manager': None,
                         'ml_predictor': None,
                         'is_running': False,
                         'update_thread': None
                     }
-                    self.bot_listbox.insert(tk.END, bot_id)
                 
-                # Restore active bot
                 active_bot = session_data.get('active_bot_id')
-                if active_bot and active_bot in self.bots:
-                    idx = list(self.bots.keys()).index(active_bot)
-                    self.bot_listbox.selection_clear(0, tk.END)
-                    self.bot_listbox.selection_set(idx)
-                    self.active_bot_id = active_bot
-                    self.load_bot_config_to_gui(active_bot)
                 
-                # Restore telegram bots for bots that have telegram config
-                for bot_id, bot_data in self.bots.items():
-                    config = bot_data['config']
-                    if 'telegram' in config:
-                        telegram_config = config['telegram']
-                        token = telegram_config.get('token', '')
-                        chat_ids = telegram_config.get('chat_ids', [])
-                        if token and chat_ids:
-                            self.telegram_bots[bot_id] = TelegramBot(token, chat_ids)
-                            self.log_message(f"✓ Telegram bot restored for {bot_id}", "INFO")
+                # ✅ Now schedule the GUI updates to main thread
+                def apply_session_to_gui():
+                    self.bots.clear()
+                    self.bot_listbox.delete(0, tk.END)
+                    
+                    # Add bots to listbox
+                    for bot_id in loaded_bots.keys():
+                        self.bots[bot_id] = loaded_bots[bot_id]
+                        self.bot_listbox.insert(tk.END, bot_id)
+                    
+                    # Restore active bot
+                    if active_bot and active_bot in self.bots:
+                        idx = list(self.bots.keys()).index(active_bot)
+                        self.bot_listbox.selection_clear(0, tk.END)
+                        self.bot_listbox.selection_set(idx)
+                        self.active_bot_id = active_bot
+                        self.load_bot_config_to_gui(active_bot)
+                    
+                    # Restore telegram bots for bots that have telegram config
+                    for bot_id, bot_data in self.bots.items():
+                        config = bot_data['config']
+                        if 'telegram' in config:
+                            telegram_config = config['telegram']
+                            token = telegram_config.get('token', '')
+                            chat_ids = telegram_config.get('chat_ids', [])
+                            if token and chat_ids:
+                                self.telegram_bots[bot_id] = TelegramBot(token, chat_ids)
+                                self.log_message(f"✓ Telegram bot restored for {bot_id}", "INFO")
+                    
+                    self.log_message("✓ Session restored", "SUCCESS")
+                    
+                    # Update Telegram bot selector if it exists
+                    try:
+                        if hasattr(self, 'telegram_bot_selector'):
+                            self.update_telegram_bot_selector()
+                    except:
+                        pass
                 
-                self.log_message("✓ Session restored", "SUCCESS")
-                
-                # Update Telegram bot selector if it exists
-                try:
-                    if hasattr(self, 'telegram_bot_selector'):
-                        self.update_telegram_bot_selector()
-                except:
-                    pass
-                
+                self.root.after(0, apply_session_to_gui)
                 return True
             except Exception as e: 
                 self.log_message(f"Load session error: {e}", "WARNING")
@@ -1282,15 +1290,13 @@ class HFTProGUI:
                 self.atr_period_var.set(config.get('atr_period', '14'))
                 self.momentum_period_var.set(config.get('momentum_period', '5'))
                 
-                # Limits
-                if 'limits' in config:
-                    limits = config['limits']
-                    self.limit_vars['max_daily_loss'].set(limits.get('max_daily_loss', '40'))
-                    self.limit_vars['max_daily_trades'].set(limits.get('max_daily_trades', '1000'))
-                    self.limit_vars['max_daily_volume'].set(limits.get('max_daily_volume', '10'))
-                    self.limit_vars['max_position_size'].set(limits.get('max_position_size', '2'))
-                    self.limit_vars['max_positions'].set(limits.get('max_positions', '20'))
-                    self.limit_vars['max_drawdown_pct'].set(limits.get('max_drawdown_pct', '10'))
+                # ✅ FIX: Risk Limits - read from top level (same as get_config_from_gui)
+                self.limit_vars['max_daily_loss'].set(str(config.get('max_daily_loss', '40')))
+                self.limit_vars['max_daily_trades'].set(str(config.get('max_daily_trades', '1000')))
+                self.limit_vars['max_daily_volume'].set(str(config.get('max_daily_volume', '10')))
+                self.limit_vars['max_position_size'].set(str(config.get('max_position_size', '2')))
+                self.limit_vars['max_positions'].set(str(config.get('max_positions', '20')))
+                self.limit_vars['max_drawdown_pct'].set(str(config.get('max_drawdown_pct', '10')))
                 
                 # Telegram Configuration
                 if 'telegram' in config:
@@ -2018,15 +2024,11 @@ class HFTProGUI:
             """Initialize asynchronously"""
             def init_thread():
                 try:
-                    # Try to load previous session first
-                    session_loaded = [False]
-                    def try_load():
-                        session_loaded[0] = self.load_session()
-                    self.root.after(0, try_load)
-                    time.sleep(0.1)  # Give Tkinter event loop a moment
-
-                    # If no session, create default bot
-                    if not session_loaded[0]:
+                    # ✅ CRITICAL FIX: Load session directly in thread, don't schedule to event loop yet
+                    session_loaded = self.load_session()
+                    
+                    # If no session was loaded, create default bot
+                    if not session_loaded:
                         self.root.after(0, lambda: self.add_bot(default=True))
                         # Auto-load default config if exists
                         if os.path.exists("config_GOLD.ls.json"):
@@ -2035,7 +2037,7 @@ class HFTProGUI:
                             self.root.after(0, lambda: self.apply_config(config))
                             self.root.after(0, lambda: self.log_message("✓ Auto-loaded GOLD config", "SUCCESS"))
 
-                    self.root.after(0, lambda: self.log_message("System ready.Configure and click START TRADING.", "INFO"))
+                    self.root.after(0, lambda: self.log_message("System ready. Configure and click START TRADING.", "INFO"))
                 except Exception as e:
                     self.root.after(0, lambda: self.log_message(f"Init warning: {str(e)}", "WARNING"))
 
