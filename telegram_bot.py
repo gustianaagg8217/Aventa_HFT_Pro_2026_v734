@@ -34,7 +34,17 @@ class TelegramBot:
     
     def __init__(self, token: str, allowed_users: list):
         self.token = token
-        self.allowed_users = allowed_users
+        
+        # Convert chat_ids to integers (they may come as strings from GUI)
+        self.allowed_users = []
+        for user in allowed_users:
+            try:
+                if isinstance(user, str):
+                    self.allowed_users.append(int(user))
+                else:
+                    self.allowed_users.append(user)
+            except (ValueError, TypeError):
+                logger.warning(f"Could not convert user ID to int: {user}")
         
         # Trading components
         self.engine = None

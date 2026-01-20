@@ -665,8 +665,6 @@ class HFTProGUI:
                                         background='#1a1e3a', foreground='#00e676')
             self.status_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(5, 0))
 
-            self.add_bot()  # Remove default=True
-
         def build_control_tab(self):
             """Build comprehensive control panel tab"""
             try:
@@ -780,7 +778,7 @@ class HFTProGUI:
                 row6.pack(fill=tk.X, pady=2)
 
                 ttk.Label(row6, text="Commission per Trade ($):", width=20).pack(side=tk.LEFT, padx=5)
-                self.commission_var = tk.StringVar(value="0.9")  # Default $0.90
+                self.commission_var = tk.StringVar(value="0.0")  # Default $0.90
                 ttk.Entry(row6, textvariable=self.commission_var, width=15).pack(side=tk.LEFT, padx=5)
 
                 ttk.Label(row6, text="ℹ️ Set broker commission per round-trip trade", 
@@ -3493,6 +3491,16 @@ This is a test message from Aventa HFT Pro 2026"""
                 else:
                     # Update existing bot
                     self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
+                
+                # Auto-start Telegram bot in background
+                try:
+                    from telegram_bot_runner import get_bot_runner
+                    runner = get_bot_runner()
+                    runner.start()  # Start event loop if not running
+                    runner.add_bot(selected_bot, self.telegram_bots[selected_bot])
+                    self.log_message(f"Telegram bot {selected_bot} started", "SUCCESS")
+                except Exception as e:
+                    self.log_message(f"Failed to start Telegram bot: {e}", "WARNING")
 
                 # Update bot's config in memory
                 if selected_bot in self.bots:
@@ -3545,6 +3553,16 @@ This is a test message from Aventa HFT Pro 2026"""
                         else:
                             self.telegram_bots[selected_bot] = TelegramBot(token, chat_ids)
                     
+                        
+                        # Auto-start Telegram bot in background
+                        try:
+                            from telegram_bot_runner import get_bot_runner
+                            runner = get_bot_runner()
+                            runner.start()  # Start event loop if not running
+                            runner.add_bot(selected_bot, self.telegram_bots[selected_bot])
+                            self.log_message(f"Telegram bot {selected_bot} started", "SUCCESS")
+                        except Exception as e:
+                            self.log_message(f"Failed to start Telegram bot: {e}", "WARNING")
                     self.update_telegram_status(f"✅ Configuration loaded for bot: {selected_bot}")
                     messagebox.showinfo("Success", f"Telegram configuration loaded for {selected_bot}!")
                 else:
