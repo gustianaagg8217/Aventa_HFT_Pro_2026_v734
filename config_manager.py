@@ -36,18 +36,18 @@ class ConfigManager:
         'enable_ml': False,
         'commission_per_trade': 0.9,
         
-        # Trading Sessions (GMT Times)
+        # Trading Sessions (WIB Times - UTC+7)
         'trading_sessions_enabled': True,
         'london_session_enabled': True,
-        'london_start': '08:00',  # GMT
-        'london_end': '16:30',    # GMT
+        'london_start': '15:00',  # WIB (08:00 GMT)
+        'london_end': '23:30',    # WIB (16:30 GMT)
         'ny_session_enabled': True,
-        'ny_start': '13:00',      # GMT
-        'ny_end': '21:00',        # GMT
+        'ny_start': '20:00',      # WIB (13:00 GMT)
+        'ny_end': '04:00',        # WIB (21:00 GMT, next day)
         'asia_session_enabled': False,
-        'asia_start': '22:00',    # GMT
-        'asia_end': '08:00',      # GMT (next day)
-        'session_timezone': 'GMT',
+        'asia_start': '05:00',    # WIB (22:00 GMT, next day)
+        'asia_end': '15:00',      # WIB (08:00 GMT)
+        'session_timezone': 'WIB',
         
         # Indicators
         'ema_fast_period': 7,

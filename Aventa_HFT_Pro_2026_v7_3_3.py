@@ -938,7 +938,7 @@ class HFTProGUI:
                         font=('Segoe UI', 8), foreground='#7c4dff').pack(side=tk.LEFT, padx=5)
 
                 # === TRADING SESSIONS ===
-                session_frame = ttk.LabelFrame(scrollable_frame, text="⏰ Trading Sessions (GMT)", padding=10)
+                session_frame = ttk.LabelFrame(scrollable_frame, text="⏰ Trading Sessions (WIB/UTC+7)", padding=10)
                 session_frame.pack(fill=tk.X, padx=10, pady=5)
 
                 # Row 1: Enable Sessions
@@ -952,39 +952,39 @@ class HFTProGUI:
                 session_row2 = ttk.Frame(session_frame)
                 session_row2.pack(fill=tk.X, pady=2)
                 self.london_session_enabled = tk.BooleanVar(value=True)
-                ttk.Checkbutton(session_row2, text="🇬🇧 London Session", 
+                ttk.Checkbutton(session_row2, text="🇬🇧 London Session (15:00-23:30 WIB)", 
                               variable=self.london_session_enabled).pack(side=tk.LEFT, padx=5)
                 ttk.Label(session_row2, text="Start:", width=6).pack(side=tk.LEFT, padx=2)
-                self.london_start_var = tk.StringVar(value="08:00")
+                self.london_start_var = tk.StringVar(value="15:00")
                 ttk.Entry(session_row2, textvariable=self.london_start_var, width=8).pack(side=tk.LEFT, padx=2)
                 ttk.Label(session_row2, text="End:", width=6).pack(side=tk.LEFT, padx=2)
-                self.london_end_var = tk.StringVar(value="16:30")
+                self.london_end_var = tk.StringVar(value="23:30")
                 ttk.Entry(session_row2, textvariable=self.london_end_var, width=8).pack(side=tk.LEFT, padx=2)
 
                 # Row 3: NY Session
                 session_row3 = ttk.Frame(session_frame)
                 session_row3.pack(fill=tk.X, pady=2)
                 self.ny_session_enabled = tk.BooleanVar(value=True)
-                ttk.Checkbutton(session_row3, text="🗽 New York Session", 
+                ttk.Checkbutton(session_row3, text="🗽 New York Session (20:00-04:00 WIB)", 
                               variable=self.ny_session_enabled).pack(side=tk.LEFT, padx=5)
                 ttk.Label(session_row3, text="Start:", width=6).pack(side=tk.LEFT, padx=2)
-                self.ny_start_var = tk.StringVar(value="13:00")
+                self.ny_start_var = tk.StringVar(value="20:00")
                 ttk.Entry(session_row3, textvariable=self.ny_start_var, width=8).pack(side=tk.LEFT, padx=2)
                 ttk.Label(session_row3, text="End:", width=6).pack(side=tk.LEFT, padx=2)
-                self.ny_end_var = tk.StringVar(value="21:00")
+                self.ny_end_var = tk.StringVar(value="04:00")
                 ttk.Entry(session_row3, textvariable=self.ny_end_var, width=8).pack(side=tk.LEFT, padx=2)
 
                 # Row 4: Asia Session
                 session_row4 = ttk.Frame(session_frame)
                 session_row4.pack(fill=tk.X, pady=2)
                 self.asia_session_enabled = tk.BooleanVar(value=False)
-                ttk.Checkbutton(session_row4, text="🏮 Asia Session", 
+                ttk.Checkbutton(session_row4, text="🏮 Asia Session (05:00-15:00 WIB)", 
                               variable=self.asia_session_enabled).pack(side=tk.LEFT, padx=5)
                 ttk.Label(session_row4, text="Start:", width=6).pack(side=tk.LEFT, padx=2)
-                self.asia_start_var = tk.StringVar(value="22:00")
+                self.asia_start_var = tk.StringVar(value="05:00")
                 ttk.Entry(session_row4, textvariable=self.asia_start_var, width=8).pack(side=tk.LEFT, padx=2)
                 ttk.Label(session_row4, text="End:", width=6).pack(side=tk.LEFT, padx=2)
-                self.asia_end_var = tk.StringVar(value="08:00")
+                self.asia_end_var = tk.StringVar(value="15:00")
                 ttk.Entry(session_row4, textvariable=self.asia_end_var, width=8).pack(side=tk.LEFT, padx=2)
 
                 # === TECHNICAL INDICATORS ===

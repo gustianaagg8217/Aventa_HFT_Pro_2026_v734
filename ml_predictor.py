@@ -538,7 +538,17 @@ class MLPredictor:
                         idx = self.feature_columns.index(col) if col in self.feature_columns else 0
                         feature_vector.append(features[idx] if idx < len(features) else 0)
                 
+                # ✅ VALIDATION: Check if we have features
+                if not feature_vector or len(feature_vector) == 0:
+                    logger.debug("No features available for prediction (data not ready)")
+                    return None, 0.0
+                
                 feature_array = np.array(feature_vector).reshape(1, -1)
+                
+                # ✅ VALIDATION: Check if array has valid shape
+                if feature_array.shape[1] == 0:
+                    logger.debug("Feature array is empty (shape=1,0) - not enough data yet")
+                    return None, 0.0
                 
                 # Scale features
                 feature_scaled = self.feature_scaler.transform(feature_array)

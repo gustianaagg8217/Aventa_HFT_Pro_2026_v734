@@ -933,6 +933,11 @@ class UltraLowLatencyEngine:
         start_time = time.perf_counter()
         
         try:
+            # ✅ CHECK: Only execute signals within allowed trading sessions
+            if not self.is_trading_session_allowed():
+                logger.debug(f"⏰ Signal blocked: Outside trading sessions - {signal.signal_type}")
+                return False
+            
             # For multi-position support, only verify positions exist (don't block new signals)
             if self.position_type and signal.signal_type != 'CLOSE':
                 # Verify positions still exist in MT5
