@@ -36,6 +36,19 @@ class ConfigManager:
         'enable_ml': False,
         'commission_per_trade': 0.9,
         
+        # Trading Sessions (GMT Times)
+        'trading_sessions_enabled': True,
+        'london_session_enabled': True,
+        'london_start': '08:00',  # GMT
+        'london_end': '16:30',    # GMT
+        'ny_session_enabled': True,
+        'ny_start': '13:00',      # GMT
+        'ny_end': '21:00',        # GMT
+        'asia_session_enabled': False,
+        'asia_start': '22:00',    # GMT
+        'asia_end': '08:00',      # GMT (next day)
+        'session_timezone': 'GMT',
+        
         # Indicators
         'ema_fast_period': 7,
         'ema_slow_period': 21,

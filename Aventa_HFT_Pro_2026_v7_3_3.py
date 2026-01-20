@@ -655,6 +655,14 @@ class HFTProGUI:
             self.style.configure('TCheckbutton', background=label_bg, foreground=fg_color)
             # Progress bar style - Green color
             self.style.configure('Backtest.Horizontal.TProgressbar', background='#00e676', troughcolor='#1a1e3a')
+            
+            # ✅ Red Scrollbar Style
+            self.style.configure('Red.Vertical.TScrollbar', background='#ff1744', troughcolor='#1a1e3a', 
+                               lightcolor='#ff1744', darkcolor='#ff1744', bordercolor='#ff1744',
+                               arrowcolor='#ffffff')
+            self.style.configure('Red.Horizontal.TScrollbar', background='#ff1744', troughcolor='#1a1e3a',
+                               lightcolor='#ff1744', darkcolor='#ff1744', bordercolor='#ff1744',
+                               arrowcolor='#ffffff')
         
         def create_gui(self):
             """Create main GUI layout"""
@@ -815,7 +823,7 @@ class HFTProGUI:
             try:
                 # Create scrollable frame
                 canvas = tk.Canvas(self.control_tab, bg='#0a0e27', highlightthickness=0)
-                scrollbar = ttk.Scrollbar(self.control_tab, orient="vertical", command=canvas.yview)
+                scrollbar = ttk.Scrollbar(self.control_tab, orient="vertical", command=canvas.yview, style='Red.Vertical.TScrollbar')
                 scrollable_frame = ttk.Frame(canvas)
 
                 scrollable_frame.bind(
@@ -929,6 +937,56 @@ class HFTProGUI:
                 ttk.Label(row6, text="ℹ️ Set broker commission per round-trip trade", 
                         font=('Segoe UI', 8), foreground='#7c4dff').pack(side=tk.LEFT, padx=5)
 
+                # === TRADING SESSIONS ===
+                session_frame = ttk.LabelFrame(scrollable_frame, text="⏰ Trading Sessions (GMT)", padding=10)
+                session_frame.pack(fill=tk.X, padx=10, pady=5)
+
+                # Row 1: Enable Sessions
+                session_row1 = ttk.Frame(session_frame)
+                session_row1.pack(fill=tk.X, pady=2)
+                self.trading_sessions_enabled = tk.BooleanVar(value=True)
+                ttk.Checkbutton(session_row1, text="Enable Trading Session Restrictions", 
+                              variable=self.trading_sessions_enabled).pack(side=tk.LEFT, padx=5)
+
+                # Row 2: London Session
+                session_row2 = ttk.Frame(session_frame)
+                session_row2.pack(fill=tk.X, pady=2)
+                self.london_session_enabled = tk.BooleanVar(value=True)
+                ttk.Checkbutton(session_row2, text="🇬🇧 London Session", 
+                              variable=self.london_session_enabled).pack(side=tk.LEFT, padx=5)
+                ttk.Label(session_row2, text="Start:", width=6).pack(side=tk.LEFT, padx=2)
+                self.london_start_var = tk.StringVar(value="08:00")
+                ttk.Entry(session_row2, textvariable=self.london_start_var, width=8).pack(side=tk.LEFT, padx=2)
+                ttk.Label(session_row2, text="End:", width=6).pack(side=tk.LEFT, padx=2)
+                self.london_end_var = tk.StringVar(value="16:30")
+                ttk.Entry(session_row2, textvariable=self.london_end_var, width=8).pack(side=tk.LEFT, padx=2)
+
+                # Row 3: NY Session
+                session_row3 = ttk.Frame(session_frame)
+                session_row3.pack(fill=tk.X, pady=2)
+                self.ny_session_enabled = tk.BooleanVar(value=True)
+                ttk.Checkbutton(session_row3, text="🗽 New York Session", 
+                              variable=self.ny_session_enabled).pack(side=tk.LEFT, padx=5)
+                ttk.Label(session_row3, text="Start:", width=6).pack(side=tk.LEFT, padx=2)
+                self.ny_start_var = tk.StringVar(value="13:00")
+                ttk.Entry(session_row3, textvariable=self.ny_start_var, width=8).pack(side=tk.LEFT, padx=2)
+                ttk.Label(session_row3, text="End:", width=6).pack(side=tk.LEFT, padx=2)
+                self.ny_end_var = tk.StringVar(value="21:00")
+                ttk.Entry(session_row3, textvariable=self.ny_end_var, width=8).pack(side=tk.LEFT, padx=2)
+
+                # Row 4: Asia Session
+                session_row4 = ttk.Frame(session_frame)
+                session_row4.pack(fill=tk.X, pady=2)
+                self.asia_session_enabled = tk.BooleanVar(value=False)
+                ttk.Checkbutton(session_row4, text="🏮 Asia Session", 
+                              variable=self.asia_session_enabled).pack(side=tk.LEFT, padx=5)
+                ttk.Label(session_row4, text="Start:", width=6).pack(side=tk.LEFT, padx=2)
+                self.asia_start_var = tk.StringVar(value="22:00")
+                ttk.Entry(session_row4, textvariable=self.asia_start_var, width=8).pack(side=tk.LEFT, padx=2)
+                ttk.Label(session_row4, text="End:", width=6).pack(side=tk.LEFT, padx=2)
+                self.asia_end_var = tk.StringVar(value="08:00")
+                ttk.Entry(session_row4, textvariable=self.asia_end_var, width=8).pack(side=tk.LEFT, padx=2)
+
                 # === TECHNICAL INDICATORS ===
                 indicator_frame = ttk.LabelFrame(scrollable_frame, text="📊 Technical Indicators", padding=10)
                 indicator_frame.pack(fill=tk.X, padx=10, pady=5)
@@ -1009,8 +1067,8 @@ class HFTProGUI:
                 preset_buttons.pack(fill=tk.X)
                 
                 ttk.Button(preset_buttons, text="🥇 GOLD Config", command=lambda: self.load_preset("config_GOLD.ls.json"), width=15).pack(side=tk.LEFT, padx=5)
-                ttk.Button(preset_buttons, text="💱 EURUSD Config", command=lambda:  self.load_preset("config_EURUSD.json"), width=15).pack(side=tk.LEFT, padx=5)
-                ttk.Button(preset_buttons, text="🏅 XAUUSD Config", command=lambda: self.load_preset("config_XAUUSD.json"), width=15).pack(side=tk.LEFT, padx=5)
+                ttk.Button(preset_buttons, text="💱 EURUSD Config", command=lambda:  self.load_preset("config_EURUSD.json"), width=19).pack(side=tk.LEFT, padx=5)
+                ttk.Button(preset_buttons, text="🏅 XAUUSD Config", command=lambda: self.load_preset("config_XAUUSD.json"), width=19).pack(side=tk.LEFT, padx=5)
                 ttk.Button(preset_buttons, text="₿ BTCUSD Config", command=lambda: self.load_preset("config_BTCUSD.json"), width=15).pack(side=tk.LEFT, padx=5)
 
             except Exception as e:
@@ -1468,7 +1526,20 @@ class HFTProGUI:
                     'mt5_path': self.mt5_path_var.get().strip(),
                     'enable_ml':  self.enable_ml_var.get(),
                     # ✅ ADD COMMISSION
-                    'commission_per_trade':  float(self.commission_var.get().strip()),                    
+                    'commission_per_trade':  float(self.commission_var.get().strip()),
+                    
+                    # Trading Sessions
+                    'trading_sessions_enabled': self.trading_sessions_enabled.get(),
+                    'london_session_enabled': self.london_session_enabled.get(),
+                    'london_start': self.london_start_var.get().strip(),
+                    'london_end': self.london_end_var.get().strip(),
+                    'ny_session_enabled': self.ny_session_enabled.get(),
+                    'ny_start': self.ny_start_var.get().strip(),
+                    'ny_end': self.ny_end_var.get().strip(),
+                    'asia_session_enabled': self.asia_session_enabled.get(),
+                    'asia_start': self.asia_start_var.get().strip(),
+                    'asia_end': self.asia_end_var.get().strip(),
+                    
                     # Indicators
                     'ema_fast_period': int(self.ema_fast_var.get().strip()),
                     'ema_slow_period': int(self.ema_slow_var.get().strip()),
@@ -2048,6 +2119,18 @@ class HFTProGUI:
                 self.enable_ml_var.set(config.get('enable_ml', False))
                 self.commission_var.set(str(config.get('commission_per_trade', 0.9)))
                 
+                # === TRADING SESSIONS ===
+                self.trading_sessions_enabled.set(config.get('trading_sessions_enabled', True))
+                self.london_session_enabled.set(config.get('london_session_enabled', True))
+                self.london_start_var.set(config.get('london_start', '08:00'))
+                self.london_end_var.set(config.get('london_end', '16:30'))
+                self.ny_session_enabled.set(config.get('ny_session_enabled', True))
+                self.ny_start_var.set(config.get('ny_start', '13:00'))
+                self.ny_end_var.set(config.get('ny_end', '21:00'))
+                self.asia_session_enabled.set(config.get('asia_session_enabled', False))
+                self.asia_start_var.set(config.get('asia_start', '22:00'))
+                self.asia_end_var.set(config.get('asia_end', '08:00'))
+                
                 # === INDICATORS ===
                 self.ema_fast_var.set(str(config.get('ema_fast_period', 7)))
                 self.ema_slow_var.set(str(config.get('ema_slow_period', 21)))
@@ -2547,7 +2630,7 @@ class HFTProGUI:
             try:  
                 # Create Canvas with scrollbar for entire tab
                 canvas = tk.Canvas(self.strategy_tab, bg='#1a1e3a', highlightthickness=0)
-                scrollbar = ttk.Scrollbar(self.strategy_tab, orient=tk.VERTICAL, command=canvas.yview)
+                scrollbar = ttk.Scrollbar(self.strategy_tab, orient=tk.VERTICAL, command=canvas.yview, style='Red.Vertical.TScrollbar')
                 
                 canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
                 scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -2741,8 +2824,8 @@ class HFTProGUI:
                 tree_container.pack(fill=tk.BOTH, expand=True)
 
                 # Scrollbars
-                tree_scroll_y = ttk.Scrollbar(tree_container, orient=tk.VERTICAL)
-                tree_scroll_x = ttk.Scrollbar(tree_container, orient=tk.HORIZONTAL)
+                tree_scroll_y = ttk.Scrollbar(tree_container, orient=tk.VERTICAL, style='Red.Vertical.TScrollbar')
+                tree_scroll_x = ttk.Scrollbar(tree_container, orient=tk.HORIZONTAL, style='Red.Horizontal.TScrollbar')
 
                 # Treeview
                 columns = ('#', 'Date/Time', 'Type', 'Entry', 'Exit', 'Profit', 'ML Pred', 'ML Conf', 'Duration')
@@ -3613,7 +3696,7 @@ class HFTProGUI:
             try:
                 # Create scrollable frame
                 canvas = tk.Canvas(self.telegram_tab, bg='#0a0e27', highlightthickness=0)
-                scrollbar = ttk.Scrollbar(self.telegram_tab, orient="vertical", command=canvas.yview)
+                scrollbar = ttk.Scrollbar(self.telegram_tab, orient="vertical", command=canvas.yview, style='Red.Vertical.TScrollbar')
                 scrollable_frame = ttk.Frame(canvas)
 
                 scrollable_frame.bind(

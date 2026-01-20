@@ -216,6 +216,68 @@ class UltraLowLatencyEngine:
         if mode_upper not in mode_map:
             logger.warning(f"⚠️ Mode pengisian '{mode_str}' nggak didukung, pakai FOK aja ya.")
         return mode_map.get(mode_upper, mt5.ORDER_FILLING_FOK)
+
+    def is_trading_session_allowed(self) -> bool:
+        """Check if current time is within allowed trading sessions"""
+        if not self.config.get('trading_sessions_enabled', True):
+            return True  # No restrictions if disabled
+        
+        from datetime import datetime
+        
+        # Get current GMT time
+        now_gmt = datetime.utcnow()
+        current_hour = now_gmt.hour
+        current_minute = now_gmt.minute
+        current_time_minutes = current_hour * 60 + current_minute
+        
+        sessions_allowed = []
+        
+        # Check London Session (08:00-16:30 GMT)
+        if self.config.get('london_session_enabled', True):
+            london_start = self._time_to_minutes(self.config.get('london_start', '08:00'))
+            london_end = self._time_to_minutes(self.config.get('london_end', '16:30'))
+            if london_start <= current_time_minutes <= london_end:
+                sessions_allowed.append('LONDON')
+        
+        # Check NY Session (13:00-21:00 GMT)
+        if self.config.get('ny_session_enabled', True):
+            ny_start = self._time_to_minutes(self.config.get('ny_start', '13:00'))
+            ny_end = self._time_to_minutes(self.config.get('ny_end', '21:00'))
+            if ny_start <= current_time_minutes <= ny_end:
+                sessions_allowed.append('NY')
+        
+        # Check Asia Session (22:00-08:00 GMT next day)
+        if self.config.get('asia_session_enabled', False):
+            asia_start = self._time_to_minutes(self.config.get('asia_start', '22:00'))
+            asia_end = self._time_to_minutes(self.config.get('asia_end', '08:00'))
+            # Asia session crosses midnight
+            if current_time_minutes >= asia_start or current_time_minutes <= asia_end:
+                sessions_allowed.append('ASIA')
+        
+        is_allowed = len(sessions_allowed) > 0
+        
+        if not is_allowed:
+            # Only log once per hour to avoid spam
+            if not hasattr(self, '_last_session_log_time'):
+                self._last_session_log_time = 0
+            
+            current_time = time.time()
+            if current_time - self._last_session_log_time > 3600:  # Log every hour
+                logger.debug(f"⏰ Outside trading sessions at {now_gmt.strftime('%H:%M GMT')}")
+                self._last_session_log_time = current_time
+        
+        return is_allowed
+    
+    @staticmethod
+    def _time_to_minutes(time_str: str) -> int:
+        """Convert HH:MM string to minutes since midnight"""
+        try:
+            parts = time_str.split(':')
+            hours = int(parts[0])
+            minutes = int(parts[1])
+            return hours * 60 + minutes
+        except:
+            return 0
         
     def initialize(self) -> bool:
         """Initialize MT5 connection"""
