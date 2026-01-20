@@ -17,12 +17,16 @@ logger = logging.getLogger(__name__)
 
 class StrategyBacktester:
 
-    def __init__(self, config, initial_balance=10000):
+    def __init__(self, config, initial_balance=10000, ml_predictor=None):
         """Initialize backtester with ISOLATED config and balance"""
         import copy
 
         # ✅ CRITICAL: Deep copy config untuk isolasi penuh
         self.config = copy.deepcopy(config)
+
+        # ✅ ML PREDICTOR INTEGRATION
+        self.ml_predictor = ml_predictor
+        self.use_ml = ml_predictor is not None and hasattr(ml_predictor, 'is_trained') and ml_predictor.is_trained
 
         # ✅ CRITICAL: Use GUI initial_balance (NEVER use account balance!)
         self.initial_balance = float(initial_balance)
@@ -388,7 +392,7 @@ class StrategyBacktester:
             raise
     
     def check_entry(self, bar, index, df):
-        """Check for entry signal with improved logic"""
+        """Check for entry signal with ML integration"""
         try:
             # Get signal strength
             signal_strength, signal_type = self.calculate_signal(bar, index, df)
@@ -396,6 +400,37 @@ class StrategyBacktester:
             min_signal = self.config.get('min_signal_strength', 0.45)
 
             if abs(signal_strength) >= min_signal:
+                # ✅ ML PREDICTION CHECK
+                ml_prediction = ''
+                ml_confidence = 0.0
+                
+                if self.use_ml:
+                    try:
+                        # Prepare features for ML
+                        features = {
+                            'returns': bar.get('returns', 0),
+                            'momentum_5': bar.get('momentum_5', 0),
+                            'momentum_10': bar.get('momentum_10', 0),
+                            'rsi': bar.get('rsi', 50),
+                            'volatility': bar.get('volatility', 0),
+                        }
+                        
+                        # Get ML prediction
+                        direction, confidence = self.ml_predictor.predict(features)
+                        
+                        if direction is not None:
+                            ml_prediction = 'BUY' if direction == 1 else 'SELL'
+                            ml_confidence = confidence * 100
+                            
+                            # Check if ML agrees with signal
+                            if ml_prediction != signal_type:
+                                # ML disagrees, reduce confidence or skip
+                                ml_confidence_threshold = self.config.get('ml_confidence_threshold', 60)
+                                if ml_confidence < ml_confidence_threshold:
+                                    return  # Skip this entry if ML confidence is low
+                    except Exception as e:
+                        logger.warning(f"ML prediction error: {e}")
+
                 # ✅ IMPROVED SPREAD CHECK
                 spread = bar['spread'] * self.pip_size  # Convert to price units
                 max_spread_pct = self.config.get('max_spread_pct', 0.001)  # 0.1% of price
@@ -436,10 +471,12 @@ class StrategyBacktester:
                     'sl': self.calculate_sl(bar, signal_type),
                     'tp': self.calculate_tp(bar, signal_type),
                     'volume': self.config.get('default_volume', 0.01),
-                    'commission': self.commission_per_trade
+                    'commission': self.commission_per_trade,
+                    'ml_prediction': ml_prediction,
+                    'ml_confidence': ml_confidence
                 }
 
-                logger.debug(f"Opened {signal_type} position at {entry_price:.5f}")
+                logger.debug(f"Opened {signal_type} position at {entry_price:.5f} (ML: {ml_prediction} {ml_confidence:.1f}%)")
 
         except Exception as e:
             logger.error(f"Entry check error: {e}")
@@ -699,7 +736,9 @@ class StrategyBacktester:
                 'reason': reason,
                 'volume': pos.get('volume', self.config.get('default_volume', 0.01)),
                 'commission': commission * 2,  # Total commission (entry + exit)
-                'symbol': self.config.get('symbol', 'UNKNOWN')
+                'symbol': self.config.get('symbol', 'UNKNOWN'),
+                'ml_prediction': pos.get('ml_prediction', ''),
+                'ml_confidence': pos.get('ml_confidence', 0)
             }
 
             self.trades.append(trade)
@@ -724,7 +763,9 @@ class StrategyBacktester:
                 'reason': f"Error: {reason}",
                 'volume': pos.get('volume', 0.01),
                 'commission': 0,
-                'symbol': self.config.get('symbol', 'UNKNOWN')
+                'symbol': self.config.get('symbol', 'UNKNOWN'),
+                'ml_prediction': pos.get('ml_prediction', ''),
+                'ml_confidence': pos.get('ml_confidence', 0)
             })
             self.open_position = None
     
@@ -900,6 +941,35 @@ class StrategyBacktester:
             if avg_win > 0 or avg_loss != 0:
                 expectancy = (win_rate/100 * avg_win) + ((100-win_rate)/100 * avg_loss)
 
+        # ✅ ML ANALYSIS METRICS
+        ml_trades = sum(1 for t in self.trades if t.get('ml_prediction', ''))
+        ml_accuracy = 0
+        ml_predicted_wins = 0
+        ml_predicted_losses = 0
+        ml_avg_confidence = 0
+        
+        if ml_trades > 0:
+            # Calculate ML prediction accuracy
+            ml_correct = 0
+            for t in self.trades:
+                if t.get('ml_prediction', ''):
+                    ml_pred = t.get('ml_prediction', '')
+                    actual_type = t.get('type', '')
+                    if ml_pred == actual_type and t['profit'] > 0:
+                        ml_correct += 1
+                    elif ml_pred != actual_type and t['profit'] < 0:
+                        ml_correct += 1
+            
+            ml_accuracy = (ml_correct / ml_trades * 100) if ml_trades > 0 else 0
+            
+            # Count ML predicted wins/losses
+            ml_predicted_wins = sum(1 for t in self.trades if t.get('ml_prediction', '') and t['profit'] > 0)
+            ml_predicted_losses = sum(1 for t in self.trades if t.get('ml_prediction', '') and t['profit'] <= 0)
+            
+            # Average confidence
+            confidences = [t.get('ml_confidence', 0) for t in self.trades if t.get('ml_confidence', 0) > 0]
+            ml_avg_confidence = (sum(confidences) / len(confidences)) if confidences else 0
+
         results = {
             'total_trades': total_trades,
             'wins': wins,
@@ -925,6 +995,11 @@ class StrategyBacktester:
             'total_commission': total_commission,
             'return_pct': return_pct,
             'annualized_return': annualized_return,
+            'ml_trades': ml_trades,
+            'ml_accuracy': ml_accuracy,
+            'ml_predicted_wins': ml_predicted_wins,
+            'ml_predicted_losses': ml_predicted_losses,
+            'ml_avg_confidence': ml_avg_confidence,
             'trades': self.trades,
             'equity_curve': self.equity_curve,
             'symbol': self.config.get('symbol', 'UNKNOWN'),

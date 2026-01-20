@@ -523,6 +523,8 @@ class HFTProGUI:
             self.style.configure('TEntry', fieldbackground=secondary_bg, foreground=fg_color)
             self.style.configure('TCombobox', fieldbackground='#000000', foreground='#ffffff')
             self.style.configure('TCheckbutton', background=label_bg, foreground=fg_color)
+            # Progress bar style - Green color
+            self.style.configure('Backtest.Horizontal.TProgressbar', background='#00e676', troughcolor='#1a1e3a')
         
         def create_gui(self):
             """Create main GUI layout"""
@@ -2425,11 +2427,11 @@ class HFTProGUI:
                 settings_row.pack(fill=tk.X, pady=5)
 
                 ttk.Label(settings_row, text="Symbol:", font=('Segoe UI', 10)).pack(side=tk.LEFT, padx=5)
-                self.bt_symbol_var = tk.StringVar(value="BTCUSD.futu")
+                self.bt_symbol_var = tk.StringVar(value="GOLD")
                 ttk.Entry(settings_row, textvariable=self.bt_symbol_var, width=15).pack(side=tk.LEFT, padx=5)
 
                 ttk.Label(settings_row, text="Initial Balance ($):", font=('Segoe UI', 10)).pack(side=tk.LEFT, padx=(20, 5))
-                self.bt_balance_var = tk.StringVar(value="10000")
+                self.bt_balance_var = tk.StringVar(value="1000")
                 ttk.Entry(settings_row, textvariable=self.bt_balance_var, width=15).pack(side=tk.LEFT, padx=5)
 
                 # Row 3: Config Source
@@ -2467,7 +2469,7 @@ class HFTProGUI:
                 
                 ttk.Label(progress_frame, text="Progress:", font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=5)
                 
-                self.bt_progress = ttk.Progressbar(progress_frame, mode='determinate', length=500)
+                self.bt_progress = ttk.Progressbar(progress_frame, mode='determinate', length=500, style='Backtest.Horizontal.TProgressbar')
                 self.bt_progress.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
                 
                 self.bt_progress_label = tk.StringVar(value="Ready")
@@ -2522,7 +2524,46 @@ class HFTProGUI:
                 self.create_bt_result(res_row3, "Avg Trade:", self.bt_results['avg_trade'], width=15)
                 self.create_bt_result(res_row3, "Avg Duration:", self.bt_results['avg_duration'], width=15)
 
-                # === TRADE HISTORY TABLE ===
+                # === ML ANALYSIS RESULTS ===
+                ml_results_frame = ttk.LabelFrame(main_container, text="🤖 ML Analysis Results", padding=10)
+                ml_results_frame.pack(fill=tk.X, pady=(0, 10))
+
+                # Initialize ML result variables
+                self.ml_results = {
+                    'ml_trades': tk.StringVar(value="0"),
+                    'ml_accuracy': tk.StringVar(value="0.0%"),
+                    'ml_predicted_wins': tk.StringVar(value="0"),
+                    'ml_predicted_losses': tk.StringVar(value="0"),
+                    'ml_avg_confidence': tk.StringVar(value="0.0%"),
+                    'ml_trained': tk.StringVar(value="❌ Not Trained"),
+                    'ml_training_status': tk.StringVar(value="Ready"),
+                }
+
+                # ML Results Grid
+                ml_grid = ttk.Frame(ml_results_frame)
+                ml_grid.pack(fill=tk.X, pady=5)
+
+                # Row 1
+                ml_row1 = ttk.Frame(ml_grid)
+                ml_row1.pack(fill=tk.X, pady=2)
+                self.create_bt_result(ml_row1, "Model Status:", self.ml_results['ml_trained'], width=15)
+                self.create_bt_result(ml_row1, "ML Trades:", self.ml_results['ml_trades'], width=10)
+                self.create_bt_result(ml_row1, "ML Accuracy:", self.ml_results['ml_accuracy'], width=12)
+                self.create_bt_result(ml_row1, "Avg Confidence:", self.ml_results['ml_avg_confidence'], width=15)
+
+                # Row 2
+                ml_row2 = ttk.Frame(ml_grid)
+                ml_row2.pack(fill=tk.X, pady=2)
+                self.create_bt_result(ml_row2, "ML Predicted Wins:", self.ml_results['ml_predicted_wins'], width=12)
+                self.create_bt_result(ml_row2, "ML Predicted Losses:", self.ml_results['ml_predicted_losses'], width=12)
+                
+                # ML Training Button
+                ml_button_frame = ttk.Frame(ml_results_frame)
+                ml_button_frame.pack(fill=tk.X, pady=(10, 0))
+                
+                self.ml_train_btn = ttk.Button(ml_button_frame, text="🧠 Train ML Model", 
+                                              command=self.train_ml_model, width=18)
+                self.ml_train_btn.pack(side=tk.LEFT, padx=5)
                 trades_frame = ttk.LabelFrame(main_container, text="📋 Trade History", padding=10)
                 trades_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
@@ -2535,7 +2576,7 @@ class HFTProGUI:
                 tree_scroll_x = ttk.Scrollbar(tree_container, orient=tk.HORIZONTAL)
 
                 # Treeview
-                columns = ('#', 'Date/Time', 'Type', 'Entry', 'Exit', 'Profit', 'Duration')
+                columns = ('#', 'Date/Time', 'Type', 'Entry', 'Exit', 'Profit', 'ML Pred', 'ML Conf', 'Duration')
                 self.bt_trades_tree = ttk.Treeview(tree_container, columns=columns, show='headings', 
                                                 height=10,
                                                 yscrollcommand=tree_scroll_y.set,
@@ -2551,6 +2592,8 @@ class HFTProGUI:
                 self.bt_trades_tree.heading('Entry', text='Entry')
                 self.bt_trades_tree.heading('Exit', text='Exit')
                 self.bt_trades_tree.heading('Profit', text='Profit')
+                self.bt_trades_tree.heading('ML Pred', text='ML Pred')
+                self.bt_trades_tree.heading('ML Conf', text='ML Conf %')
                 self.bt_trades_tree.heading('Duration', text='Duration')
 
                 # Define column widths
@@ -2560,6 +2603,8 @@ class HFTProGUI:
                 self.bt_trades_tree.column('Entry', width=80, anchor=tk.E)
                 self.bt_trades_tree.column('Exit', width=80, anchor=tk.E)
                 self.bt_trades_tree.column('Profit', width=100, anchor=tk.E)
+                self.bt_trades_tree.column('ML Pred', width=70, anchor=tk.CENTER)
+                self.bt_trades_tree.column('ML Conf', width=70, anchor=tk.CENTER)
                 self.bt_trades_tree.column('Duration', width=100, anchor=tk.CENTER)
 
                 # Pack treeview and scrollbars
@@ -2645,7 +2690,7 @@ class HFTProGUI:
                 pass
 
         def display_backtest_results(self, results):
-            """Display backtest results in UI"""
+            """Display backtest results in UI with ML predictions"""
             try:
                 # Update result variables
                 self.bt_results['total_trades'].set(str(results.get('total_trades', 0)))
@@ -2660,6 +2705,20 @@ class HFTProGUI:
                 self.bt_results['worst_trade'].set(f"${results.get('worst_trade', 0):.2f}")
                 self.bt_results['avg_trade'].set(f"${results.get('avg_trade', 0):.2f}")
                 self.bt_results['avg_duration'].set(results.get('avg_duration', '0 min'))
+                
+                # Update ML results if available
+                if hasattr(self, 'ml_predictor') and self.ml_predictor:
+                    ml_trades = results.get('ml_trades', 0)
+                    ml_accuracy = results.get('ml_accuracy', 0)
+                    ml_pred_wins = results.get('ml_predicted_wins', 0)
+                    ml_pred_losses = results.get('ml_predicted_losses', 0)
+                    ml_avg_conf = results.get('ml_avg_confidence', 0)
+                    
+                    self.ml_results['ml_trades'].set(str(ml_trades))
+                    self.ml_results['ml_accuracy'].set(f"{ml_accuracy:.1f}%")
+                    self.ml_results['ml_predicted_wins'].set(str(ml_pred_wins))
+                    self.ml_results['ml_predicted_losses'].set(str(ml_pred_losses))
+                    self.ml_results['ml_avg_confidence'].set(f"{ml_avg_conf:.1f}%")
                 
                 # Clear and populate trade history table
                 for item in self.bt_trades_tree.get_children():
@@ -2680,6 +2739,10 @@ class HFTProGUI:
                     else:
                         dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
                     
+                    # Get ML prediction if available
+                    ml_pred = trade.get('ml_prediction', '')
+                    ml_confidence = trade.get('ml_confidence', 0)
+                    
                     self.bt_trades_tree.insert('', 'end', values=(
                         i,
                         dt_str,
@@ -2687,15 +2750,90 @@ class HFTProGUI:
                         f"{trade.get('entry_price', 0):.5f}",
                         f"{trade.get('exit_price', 0):.5f}",
                         f"${profit:.2f}",
+                        ml_pred if ml_pred else '—',
+                        f"{ml_confidence:.0f}%" if ml_confidence else '—',
                         trade.get('duration', '')
                     ), tags=(tag,))
                 
-                self.add_bt_log(f"✓ Results displayed:  {len(self.bt_trade_list)} trades", "SUCCESS")
+                self.add_bt_log(f"✓ Results displayed: {len(self.bt_trade_list)} trades", "SUCCESS")
                 
             except Exception as e:
                 self.log_message(f"Display results error: {e}", "ERROR")
                 import traceback
                 traceback.print_exc()
+
+        def train_ml_model(self):
+            """Train ML model in background thread"""
+            try:
+                symbol = self.bt_symbol_var.get().strip()
+                if not symbol:
+                    messagebox.showerror("Error", "Please enter a symbol first!")
+                    return
+                
+                self.ml_train_btn.config(state=tk.DISABLED)
+                self.ml_results['ml_training_status'].set("Training...")
+                
+                def ml_training_thread():
+                    try:
+                        self.root.after(0, lambda: self.add_bt_log("="*60, "INFO"))
+                        self.root.after(0, lambda: self.add_bt_log("🧠 Starting ML Model Training...", "INFO"))
+                        self.root.after(0, lambda: self.add_bt_log(f"📊 Symbol: {symbol}", "INFO"))
+                        self.root.after(0, lambda: self.add_bt_log("⏳ Collecting historical data (30 days)...", "INFO"))
+                        
+                        # Import ML predictor
+                        from ml_predictor import MLPredictor
+                        
+                        # Get bot config
+                        if self.active_bot_id and self.active_bot_id in self.bots:
+                            import copy
+                            config = copy.deepcopy(self.bots[self.active_bot_id]['config'])
+                        else:
+                            config = self.get_config_from_gui()
+                        
+                        config['symbol'] = symbol
+                        config['enable_ml'] = True
+                        
+                        # Initialize ML predictor
+                        ml_predictor = MLPredictor(symbol, config)
+                        
+                        # Train
+                        self.root.after(0, lambda: self.add_bt_log("📚 Training models...", "INFO"))
+                        success = ml_predictor.train(days=30)
+                        
+                        if success:
+                            self.root.after(0, lambda: self.add_bt_log("✅ ML Model Training Completed!", "SUCCESS"))
+                            self.root.after(0, lambda: self.ml_results['ml_trained'].set("✅ Trained"))
+                            self.root.after(0, lambda: self.ml_results['ml_training_status'].set("Ready"))
+                            
+                            # Store ML predictor for backtest
+                            self.ml_predictor = ml_predictor
+                            
+                            # Log training stats
+                            if hasattr(ml_predictor, 'training_stats'):
+                                stats = ml_predictor.training_stats
+                                self.root.after(0, lambda: self.add_bt_log(f"  📈 Training Accuracy: {stats.get('train_accuracy', 0):.2%}", "INFO"))
+                                self.root.after(0, lambda: self.add_bt_log(f"  🎯 Test Accuracy: {stats.get('test_accuracy', 0):.2%}", "INFO"))
+                        else:
+                            self.root.after(0, lambda: self.add_bt_log("❌ ML Training Failed!", "ERROR"))
+                            self.root.after(0, lambda: self.ml_results['ml_trained'].set("❌ Failed"))
+                            self.root.after(0, lambda: self.ml_results['ml_training_status'].set("Failed"))
+                        
+                        self.root.after(0, lambda: self.add_bt_log("="*60, "INFO"))
+                        
+                    except ImportError:
+                        self.root.after(0, lambda: self.add_bt_log("❌ Failed to import ML predictor", "ERROR"))
+                        self.root.after(0, lambda: self.add_bt_log("Make sure ml_predictor.py is in the same folder", "ERROR"))
+                    except Exception as e:
+                        self.root.after(0, lambda: self.add_bt_log(f"❌ ML Training Error: {str(e)}", "ERROR"))
+                    finally:
+                        self.root.after(0, lambda: self.ml_train_btn.config(state=tk.NORMAL))
+                
+                # Start training thread
+                threading.Thread(target=ml_training_thread, daemon=True, name="MLTrainingThread").start()
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"ML training error: {str(e)}")
+                self.ml_train_btn.config(state=tk.NORMAL)
 
         def cancel_backtest(self):
             """Cancel running backtest"""
@@ -2767,7 +2905,7 @@ class HFTProGUI:
                 messagebox.showerror("Error", error_msg)
 
         def export_trades_csv(self):
-            """Export trade history to CSV"""
+            """Export trade history to CSV with running balance"""
             try: 
                 if not hasattr(self, 'bt_trade_list') or len(self.bt_trade_list) == 0:
                     messagebox.showwarning("Warning", "No trades to export!")
@@ -2786,9 +2924,41 @@ class HFTProGUI:
                     with open(filename, 'w', newline='') as f:
                         writer = csv.writer(f)
                         
+                        # Get initial balance from first trade's Saldo Awal
+                        initial_balance = 0.0
+                        if len(self.bt_trade_list) > 0:
+                            first_trade = self.bt_trade_list[0]
+                            initial_balance = float(first_trade.get('profit', 0))
+                            # Calculate backward to get true initial balance
+                            running_balance = 0.0
+                            for i, trade in enumerate(self.bt_trade_list):
+                                profit = float(trade.get('profit', 0))
+                                if i == 0:
+                                    initial_balance = -profit  # First trade's profit to reverse back to initial
+                                running_balance += profit
+                            # Get initial balance from first trade
+                            initial_balance = 0.0
+                            if len(self.bt_trade_list) > 0:
+                                # Reverse calculate from all trades
+                                total_profit = sum(float(t.get('profit', 0)) for t in self.bt_trade_list)
+                                initial_balance = self.balance - total_profit if hasattr(self, 'balance') else 1000.0
+                                # Or use the value from backtest
+                                if hasattr(self, 'bt_balance_var'):
+                                    try:
+                                        initial_balance = float(self.bt_balance_var.get())
+                                    except:
+                                        initial_balance = 1000.0
+                        
+                        # Baris pertama: Initial Balance
+                        writer.writerow(['Initial Balance ($)', initial_balance])
+                        writer.writerow([])  # Empty row for spacing
+                        
                         # Header
                         writer.writerow(['#', 'Entry Time', 'Exit Time', 'Type', 'Entry Price', 
-                                    'Exit Price', 'Profit', 'Duration', 'Reason'])
+                                    'Exit Price', 'Profit', 'Saldo Awal', 'Saldo Akhir', 'Duration', 'Reason'])
+                        
+                        # Calculate running balance
+                        running_balance = initial_balance
                         
                         # Trades
                         for i, trade in enumerate(self.bt_trade_list, 1):
@@ -2801,6 +2971,11 @@ class HFTProGUI:
                             if isinstance(exit_time, datetime):
                                 exit_time = exit_time.strftime('%Y-%m-%d %H:%M:%S')
                             
+                            profit = float(trade.get('profit', 0))
+                            saldo_awal = running_balance
+                            saldo_akhir = running_balance + profit
+                            running_balance = saldo_akhir
+                            
                             writer.writerow([
                                 i,
                                 entry_time,
@@ -2808,7 +2983,9 @@ class HFTProGUI:
                                 trade.get('type', ''),
                                 f"{trade.get('entry_price', 0):.5f}",
                                 f"{trade.get('exit_price', 0):.5f}",
-                                f"{trade.get('profit', 0):.2f}",
+                                f"{profit:.2f}",
+                                f"{saldo_awal:.2f}",
+                                f"{saldo_akhir:.2f}",
                                 trade.get('duration', ''),
                                 trade.get('reason', '')
                             ])
@@ -2936,9 +3113,16 @@ class HFTProGUI:
                         
                         from strategy_backtester import StrategyBacktester
                         
-                        # ✅ CREATE BACKTESTER WITH ISOLATED BALANCE
+                        # ✅ GET ML PREDICTOR IF AVAILABLE
+                        ml_predictor = getattr(self, 'ml_predictor', None)
+                        if ml_predictor and hasattr(ml_predictor, 'is_trained') and ml_predictor.is_trained:
+                            self.root.after(0, lambda: self.add_bt_log("✅ ML Predictor available and trained", "SUCCESS"))
+                        else:
+                            ml_predictor = None
+                        
+                        # ✅ CREATE BACKTESTER WITH ISOLATED BALANCE AND ML PREDICTOR
                         self.root.after(0, lambda: self.add_bt_log("✓ Backtester initialized", "SUCCESS"))
-                        backtester = StrategyBacktester(config, initial_balance)  # ← CRITICAL!
+                        backtester = StrategyBacktester(config, initial_balance, ml_predictor=ml_predictor)  # ← WITH ML!
                         
                         # ✅ CHECK SYMBOL AVAILABILITY WITH FUZZY MATCHING
                         self.root.after(0, lambda: self.add_bt_log(f"🔍 Checking symbol availability...", "INFO"))
