@@ -84,9 +84,13 @@ class TextWidgetLogger:
         self.gui = gui_instance
         
     def write(self, message):
-        """Write message to GUI logs"""
+        """Write message to GUI logs (with filtering for repetitive system messages)"""
         if message.strip():
             try:
+                # Filter out repetitive system/performance messages
+                if self._should_filter_message(message):
+                    return
+                
                 # Determine log level based on message content
                 level = "INFO"
                 if "ERROR" in message.upper() or "FAILED" in message.upper():
@@ -99,6 +103,28 @@ class TextWidgetLogger:
                 self.gui.log_message(message.strip(), level)
             except:
                 pass
+    
+    def _should_filter_message(self, message):
+        """Check if message should be filtered out (repetitive system updates)"""
+        msg_lower = message.lower()
+        
+        # Filter out repetitive performance/system update messages
+        filter_keywords = [
+            "network update:",
+            "disk update:",
+            "cpu usage:",
+            "memory usage:",
+            "gpu usage:",
+            "kb/s",
+            "mb/s",
+            "gb/s",
+        ]
+        
+        for keyword in filter_keywords:
+            if keyword in msg_lower:
+                return True
+        
+        return False
     
     def flush(self):
         """Flush method for compatibility"""
