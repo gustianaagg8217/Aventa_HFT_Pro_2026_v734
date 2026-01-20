@@ -10,15 +10,17 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 import json
 import logging
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List
 import sys
 import os
+import time
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from aventa_hft_core import UltraLowLatencyEngine
 from risk_manager import RiskManager
+from bot_control_ipc import get_ipc
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -62,6 +64,9 @@ class TelegramBot:
         self.app.add_handler(CommandHandler("positions", self.cmd_positions))
         self.app.add_handler(CommandHandler("start_trading", self.cmd_start_trading))
         self.app.add_handler(CommandHandler("stop_trading", self.cmd_stop_trading))
+        self.app.add_handler(CommandHandler("start_bot", self.cmd_start_bot))
+        self.app.add_handler(CommandHandler("stop_bot", self.cmd_stop_bot))
+        self.app.add_handler(CommandHandler("bots", self.cmd_list_bots))
         self.app.add_handler(CommandHandler("close_all", self.cmd_close_all))
         self.app.add_handler(CommandHandler("config", self.cmd_config))
         self.app.add_handler(CommandHandler("edit", self.cmd_edit_config))
@@ -404,6 +409,228 @@ Use the buttons below for quick actions 👇
         self.is_trading = False
         
         await update.message.reply_text("✅ Trading stopped")
+    
+    async def cmd_start_bot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Start specific bot: /start_bot <bot_id>
+        
+        Usage:
+            /start_bot - Show list of available bots
+            /start_bot Bot_1 - Start Bot_1
+        """
+        user_id = update.effective_user.id
+        username = update.effective_user.username or "Unknown"
+        
+        if not self.is_authorized(user_id):
+            await update.message.reply_text("❌ Unauthorized")
+            logger.warning(f"Unauthorized bot control attempt from user {user_id}")
+            return
+        
+        try:
+            ipc = get_ipc()
+            
+            # If no bot_id provided, show list
+            if not context.args:
+                bots = ipc.get_all_bots()
+                if not bots:
+                    await update.message.reply_text("❌ No bots found. Please start the GUI launcher first.")
+                    return
+                
+                msg = "🤖 *Available Bots:*\n━━━━━━━━━━━━━━━━\n\n"
+                for bot_id, status in bots.items():
+                    is_running = status.get('is_running', False)
+                    emoji = "🟢" if is_running else "🔴"
+                    status_text = "RUNNING" if is_running else "STOPPED"
+                    msg += f"{emoji} `{bot_id}` - {status_text}\n"
+                
+                msg += "\n*Usage:*\n/start_bot <bot_id>\n"
+                msg += "Example: /start_bot Bot_1"
+                
+                await update.message.reply_text(msg, parse_mode='Markdown')
+                return
+            
+            # Start specific bot
+            bot_id = context.args[0]
+            
+            # Check if bot exists
+            bot_status = ipc.get_bot_status(bot_id)
+            if bot_status is None:
+                await update.message.reply_text(f"❌ Bot `{bot_id}` not found", parse_mode='Markdown')
+                return
+            
+            # Check if already running
+            if bot_status.get('is_running', False):
+                await update.message.reply_text(f"⚠️ Bot `{bot_id}` is already running", parse_mode='Markdown')
+                return
+            
+            # Send start command
+            cmd_id = ipc.send_command('start', bot_id, user_id, username)
+            if not cmd_id:
+                await update.message.reply_text(f"❌ Failed to send start command")
+                return
+            
+            await update.message.reply_text(f"⏳ Starting bot `{bot_id}`...", parse_mode='Markdown')
+            
+            # Wait for response (up to 5 seconds)
+            response = ipc.get_latest_response(cmd_id, timeout=5.0)
+            
+            if response:
+                if response.get('success'):
+                    msg = f"✅ *Bot Started!*\n\n"
+                    msg += f"Bot ID: `{bot_id}`\n"
+                    msg += f"Started by: @{username}\n"
+                    msg += f"Time: {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    msg += f"🟢 Status: *TRADING ACTIVE*"
+                    await update.message.reply_text(msg, parse_mode='Markdown')
+                    logger.info(f"Bot {bot_id} started via Telegram by user {user_id} (@{username})")
+                else:
+                    await update.message.reply_text(
+                        f"❌ Failed to start bot:\n{response.get('message', 'Unknown error')}",
+                        parse_mode='Markdown'
+                    )
+            else:
+                await update.message.reply_text(
+                    f"⚠️ Start command sent but no response from GUI (check if launcher is running)",
+                    parse_mode='Markdown'
+                )
+        
+        except Exception as e:
+            logger.error(f"Error in cmd_start_bot: {e}")
+            await update.message.reply_text(f"❌ Error: {str(e)}")
+    
+    async def cmd_stop_bot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Stop specific bot: /stop_bot <bot_id>
+        
+        Usage:
+            /stop_bot - Show list of running bots
+            /stop_bot Bot_1 - Stop Bot_1
+        """
+        user_id = update.effective_user.id
+        username = update.effective_user.username or "Unknown"
+        
+        if not self.is_authorized(user_id):
+            await update.message.reply_text("❌ Unauthorized")
+            logger.warning(f"Unauthorized bot control attempt from user {user_id}")
+            return
+        
+        try:
+            ipc = get_ipc()
+            
+            # If no bot_id provided, show list of running bots
+            if not context.args:
+                bots = ipc.get_all_bots()
+                running_bots = {k: v for k, v in bots.items() if v.get('is_running', False)}
+                
+                if not running_bots:
+                    await update.message.reply_text("❌ No bots are currently running.")
+                    return
+                
+                msg = "🤖 *Running Bots:*\n━━━━━━━━━━━━━━━━\n\n"
+                for bot_id, status in running_bots.items():
+                    msg += f"🟢 `{bot_id}` - RUNNING\n"
+                
+                msg += "\n*Usage:*\n/stop_bot <bot_id>\n"
+                msg += "Example: /stop_bot Bot_1"
+                
+                await update.message.reply_text(msg, parse_mode='Markdown')
+                return
+            
+            # Stop specific bot
+            bot_id = context.args[0]
+            
+            # Check if bot exists
+            bot_status = ipc.get_bot_status(bot_id)
+            if bot_status is None:
+                await update.message.reply_text(f"❌ Bot `{bot_id}` not found", parse_mode='Markdown')
+                return
+            
+            # Check if already stopped
+            if not bot_status.get('is_running', False):
+                await update.message.reply_text(f"⚠️ Bot `{bot_id}` is already stopped", parse_mode='Markdown')
+                return
+            
+            # Send stop command
+            cmd_id = ipc.send_command('stop', bot_id, user_id, username)
+            if not cmd_id:
+                await update.message.reply_text(f"❌ Failed to send stop command")
+                return
+            
+            await update.message.reply_text(f"⏳ Stopping bot `{bot_id}`...", parse_mode='Markdown')
+            
+            # Wait for response (up to 5 seconds)
+            response = ipc.get_latest_response(cmd_id, timeout=5.0)
+            
+            if response:
+                if response.get('success'):
+                    msg = f"✅ *Bot Stopped!*\n\n"
+                    msg += f"Bot ID: `{bot_id}`\n"
+                    msg += f"Stopped by: @{username}\n"
+                    msg += f"Time: {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    msg += f"🔴 Status: *STOPPED*"
+                    await update.message.reply_text(msg, parse_mode='Markdown')
+                    logger.info(f"Bot {bot_id} stopped via Telegram by user {user_id} (@{username})")
+                else:
+                    await update.message.reply_text(
+                        f"❌ Failed to stop bot:\n{response.get('message', 'Unknown error')}",
+                        parse_mode='Markdown'
+                    )
+            else:
+                await update.message.reply_text(
+                    f"⚠️ Stop command sent but no response from GUI (check if launcher is running)",
+                    parse_mode='Markdown'
+                )
+        
+        except Exception as e:
+            logger.error(f"Error in cmd_stop_bot: {e}")
+            await update.message.reply_text(f"❌ Error: {str(e)}")
+    
+    async def cmd_list_bots(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """List all bots and their status"""
+        user_id = update.effective_user.id
+        
+        if not self.is_authorized(user_id):
+            await update.message.reply_text("❌ Unauthorized")
+            return
+        
+        try:
+            ipc = get_ipc()
+            bots = ipc.get_all_bots()
+            
+            if not bots:
+                await update.message.reply_text("❌ No bots found. Please start the GUI launcher first.")
+                return
+            
+            msg = "🤖 *Bot Status Report*\n━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            running_count = 0
+            for bot_id, status in bots.items():
+                is_running = status.get('is_running', False)
+                if is_running:
+                    running_count += 1
+                
+                emoji = "🟢" if is_running else "🔴"
+                status_text = "TRADING ACTIVE" if is_running else "STOPPED"
+                symbol = status.get('symbol', 'N/A')
+                magic = status.get('magic_number', 'N/A')
+                
+                msg += f"{emoji} *{bot_id}*\n"
+                msg += f"   Symbol: {symbol}\n"
+                msg += f"   Magic: {magic}\n"
+                msg += f"   Status: {status_text}\n"
+                msg += f"   Last update: {status.get('updated_at', 'N/A')}\n\n"
+            
+            msg += f"━━━━━━━━━━━━━━━━━━━━\n"
+            msg += f"Total bots: {len(bots)}\n"
+            msg += f"Running: {running_count}\n"
+            msg += f"Stopped: {len(bots) - running_count}\n\n"
+            msg += f"*Commands:*\n"
+            msg += f"/start_bot <bot_id> - Start bot\n"
+            msg += f"/stop_bot <bot_id> - Stop bot"
+            
+            await update.message.reply_text(msg, parse_mode='Markdown')
+        
+        except Exception as e:
+            logger.error(f"Error in cmd_list_bots: {e}")
+            await update.message.reply_text(f"❌ Error: {str(e)}")
     
     async def cmd_close_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Close all positions"""

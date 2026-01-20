@@ -4,6 +4,7 @@ from config_manager import ConfigManager
 from thread_safety import ThreadSafeGUI, ThreadSafeCallback
 from trade_database import TradeDatabase
 from telegram_bot import TelegramBot
+from gui_telegram_integration import get_gui_telegram_integration
 
 def anti_debug():
     try:
@@ -184,6 +185,10 @@ class HFTProGUI:
         def on_closing(self):
             """Handle window close event"""
             try:
+                # Stop Telegram integration
+                if hasattr(self, 'telegram_integration'):
+                    self.telegram_integration.stop_command_listener()
+                
                 # Save session before closing
                 self.save_session()
                 # Stop all running bots
@@ -278,6 +283,9 @@ class HFTProGUI:
             
             # Telegram bot instances
             self.telegram_bots = {}
+            
+            # Initialize GUI-Telegram Integration
+            self.telegram_integration = get_gui_telegram_integration(self)
             
             # For backward compatibility
             self.engine = None
@@ -390,7 +398,11 @@ class HFTProGUI:
                             self.root.after(0, lambda: self.apply_config(config))
                             self.root.after(0, lambda: self.log_message("✓ Auto-loaded GOLD config", "SUCCESS"))
 
-                    self.root.after(0, lambda: self.log_message("System ready.Configure and click START TRADING.", "INFO"))
+                    # Start Telegram command listener
+                    self.telegram_integration.start_command_listener()
+                    self.root.after(0, lambda: self.log_message("✓ Telegram integration ready", "SUCCESS"))
+                    
+                    self.root.after(0, lambda: self.log_message("System ready. Configure and click START TRADING.", "INFO"))
                 except Exception as e:
                     self.root.after(0, lambda: self.log_message(f"Init warning: {str(e)}", "WARNING"))
 
@@ -1472,6 +1484,14 @@ class HFTProGUI:
                     # Update status bar
                     self.status_bar.config(text=f"{self.active_bot_id}:  TRADING ACTIVE", foreground='#00e676')
                     
+                    # Update bot status in IPC (for Telegram)
+                    additional_info = {
+                        'symbol': config['symbol'],
+                        'magic_number': config['magic_number'],
+                        'volume': config.get('default_volume', 0.01)
+                    }
+                    self.telegram_integration.update_bot_status(self.active_bot_id, True, additional_info)
+                    
                     self.log_message(f"✓ {self.active_bot_id} started successfully!", "SUCCESS")
                     self.log_message(f"  Symbol: {config['symbol']} | Magic: {config['magic_number']}", "INFO")
                 else:
@@ -1501,6 +1521,9 @@ class HFTProGUI:
                 
                 # Update status bar
                 self.status_bar.config(text=f"{self.active_bot_id}:   Stopped", foreground='#ff1744')
+                
+                # Update bot status in IPC (for Telegram)
+                self.telegram_integration.update_bot_status(self.active_bot_id, False)
                 
                 self.log_message(f"✓ {self.active_bot_id} stopped", "INFO")
                 
