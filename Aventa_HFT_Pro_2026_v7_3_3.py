@@ -78,6 +78,33 @@ TRANSLATIONS = {
 }
 
 
+class TextWidgetLogger:
+    """Custom logging handler that redirects output to GUI Text widget"""
+    def __init__(self, gui_instance):
+        self.gui = gui_instance
+        
+    def write(self, message):
+        """Write message to GUI logs"""
+        if message.strip():
+            try:
+                # Determine log level based on message content
+                level = "INFO"
+                if "ERROR" in message.upper() or "FAILED" in message.upper():
+                    level = "ERROR"
+                elif "WARNING" in message.upper() or "WARN" in message.upper():
+                    level = "WARNING"
+                elif "SUCCESS" in message.upper() or "✓" in message or "✅" in message:
+                    level = "SUCCESS"
+                    
+                self.gui.log_message(message.strip(), level)
+            except:
+                pass
+    
+    def flush(self):
+        """Flush method for compatibility"""
+        pass
+
+
 class HFTProGUI:
         def start_all_bots(self):
             """Start trading for all bots"""
@@ -352,6 +379,9 @@ class HFTProGUI:
             # Create GUI
             self.create_gui()
             
+            # Setup logging to GUI (redirect stdout/stderr to logs tab)
+            self.root.after(100, self.setup_logging)
+            
             # Start performance update loop
             self.root.after(1000, self.update_performance_display)
             
@@ -431,9 +461,23 @@ class HFTProGUI:
                     self.ml_log_text.insert(tk.END, formatted_msg, level)
                     self.ml_log_text.see(tk.END)
                     
-                print(formatted_msg.strip())  # Also print to console
+                # Don't print to console, only to GUI logs
             except Exception as e:
-                print(f"Logging error: {e}")
+                pass
+
+        def setup_logging(self):
+            """Setup logging to redirect stdout/stderr to GUI logs tab"""
+            try:
+                # Create custom logger
+                logger_stream = TextWidgetLogger(self)
+                
+                # Redirect stdout and stderr to GUI
+                sys.stdout = logger_stream
+                sys.stderr = logger_stream
+                
+                self.log_message("✓ Logging system initialized - All console output redirected to Logs tab", "SUCCESS")
+            except Exception as e:
+                print(f"Setup logging error: {e}")
 
         def log_ml_message(self, message, level="INFO"):
             """Add message to ML training log"""
@@ -2484,10 +2528,10 @@ class HFTProGUI:
                         command=self.export_backtest_results, width=18).pack(side=tk.LEFT, padx=5)
                 
                 ttk.Button(control_row, text="📁 Export Trades CSV", 
-                        command=self.export_trades_csv, width=18).pack(side=tk.LEFT, padx=5)
+                        command=self.export_trades_csv, width=18).pack(side=tk.LEFT, padx=7)
                 
                 ttk.Button(control_row, text="🔄 Convert CSV2Excel", 
-                        command=self.launch_csv_converter, width=18).pack(side=tk.LEFT, padx=5)
+                        command=self.launch_csv_converter, width=18).pack(side=tk.LEFT, padx=7)
 
                 # Progress Bar
                 progress_frame = ttk.Frame(config_frame)
@@ -2504,7 +2548,7 @@ class HFTProGUI:
 
                 # === RESULTS SUMMARY ===
                 results_frame = ttk.LabelFrame(main_container, text="📊 Backtest Results", padding=10)
-                results_frame.pack(fill=tk.X, pady=(0, 10))
+                results_frame.pack(fill=tk.X, pady=(0, 10), padx=10)
 
                 # Initialize result variables
                 self.bt_results = {
@@ -2552,7 +2596,7 @@ class HFTProGUI:
 
                 # === ML ANALYSIS RESULTS ===
                 ml_results_frame = ttk.LabelFrame(main_container, text="🤖 ML Analysis Results", padding=10)
-                ml_results_frame.pack(fill=tk.X, pady=(0, 10))
+                ml_results_frame.pack(fill=tk.X, pady=(0, 10), padx=10)
 
                 # Initialize ML result variables
                 self.ml_results = {
@@ -2591,7 +2635,7 @@ class HFTProGUI:
                                               command=self.train_ml_model, width=18)
                 self.ml_train_btn.pack(side=tk.LEFT, padx=5)
                 trades_frame = ttk.LabelFrame(main_container, text="📋 Trade History", padding=10)
-                trades_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+                trades_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10), padx=10)
 
                 # Create Treeview with scrollbars
                 tree_container = ttk.Frame(trades_frame)
@@ -2650,7 +2694,7 @@ class HFTProGUI:
 
                 # === BACKTEST LOGS ===
                 logs_frame = ttk.LabelFrame(main_container, text="📝 Backtest Logs", padding=10)
-                logs_frame.pack(fill=tk.BOTH, expand=True)
+                logs_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
 
                 self.bt_log_text = scrolledtext.ScrolledText(logs_frame, wrap=tk.WORD, height=10,
                                                             bg='#1a1e3a', fg='#e0e0e0', font=("Courier", 9))
@@ -2811,6 +2855,17 @@ class HFTProGUI:
                         
                         # Import ML predictor
                         from ml_predictor import MLPredictor
+                        import MetaTrader5 as mt5
+                        
+                        # Initialize MT5 first
+                        if not mt5.initialize():
+                            self.root.after(0, lambda: self.add_bt_log("❌ Failed to initialize MT5", "ERROR"))
+                            self.root.after(0, lambda: self.add_bt_log("   Make sure MT5 is running", "ERROR"))
+                            self.root.after(0, lambda: self.ml_results['ml_trained'].set("❌ MT5 Failed"))
+                            self.root.after(0, lambda: self.ml_results['ml_training_status'].set("MT5 Error"))
+                            return
+                        
+                        self.root.after(0, lambda: self.add_bt_log("✓ MT5 initialized", "INFO"))
                         
                         # Get bot config
                         if self.active_bot_id and self.active_bot_id in self.bots:
@@ -2823,10 +2878,11 @@ class HFTProGUI:
                         config['enable_ml'] = True
                         
                         # Initialize ML predictor
+                        self.root.after(0, lambda: self.add_bt_log(f"📚 Initializing ML predictor for {symbol}...", "INFO"))
                         ml_predictor = MLPredictor(symbol, config)
                         
                         # Train
-                        self.root.after(0, lambda: self.add_bt_log("📚 Training models...", "INFO"))
+                        self.root.after(0, lambda: self.add_bt_log("📚 Training models (RandomForest + GradientBoosting)...", "INFO"))
                         success = ml_predictor.train(days=30)
                         
                         if success:
@@ -2844,16 +2900,22 @@ class HFTProGUI:
                                 self.root.after(0, lambda: self.add_bt_log(f"  🎯 Test Accuracy: {stats.get('test_accuracy', 0):.2%}", "INFO"))
                         else:
                             self.root.after(0, lambda: self.add_bt_log("❌ ML Training Failed!", "ERROR"))
+                            self.root.after(0, lambda: self.add_bt_log("   Check backtest logs for details", "ERROR"))
                             self.root.after(0, lambda: self.ml_results['ml_trained'].set("❌ Failed"))
                             self.root.after(0, lambda: self.ml_results['ml_training_status'].set("Failed"))
                         
                         self.root.after(0, lambda: self.add_bt_log("="*60, "INFO"))
                         
-                    except ImportError:
+                    except ImportError as e:
                         self.root.after(0, lambda: self.add_bt_log("❌ Failed to import ML predictor", "ERROR"))
-                        self.root.after(0, lambda: self.add_bt_log("Make sure ml_predictor.py is in the same folder", "ERROR"))
+                        self.root.after(0, lambda: self.add_bt_log(f"   Error: {str(e)}", "ERROR"))
+                        self.root.after(0, lambda: self.add_bt_log("   Make sure ml_predictor.py is in the same folder", "ERROR"))
+                        self.root.after(0, lambda: self.ml_results['ml_trained'].set("❌ Import Failed"))
                     except Exception as e:
                         self.root.after(0, lambda: self.add_bt_log(f"❌ ML Training Error: {str(e)}", "ERROR"))
+                        self.root.after(0, lambda: self.ml_results['ml_trained'].set("❌ Error"))
+                        import traceback
+                        self.root.after(0, lambda: self.add_bt_log(f"   Traceback: {traceback.format_exc()}", "ERROR"))
                     finally:
                         self.root.after(0, lambda: self.ml_train_btn.config(state=tk.NORMAL))
                 
@@ -5242,11 +5304,28 @@ This is a test message from Aventa HFT Pro 2026"""
 def main():
     """Main entry point with proper error handling"""
     try: 
-        print("Starting Aventa HFT Pro...")  # Debug print
         root = tk.Tk()
-        print("Tkinter root created...")  # Debug print
         app = HFTProGUI(root)
-        print("GUI initialized, starting mainloop...")  # Debug print
+        
+        # Setup global exception handler
+        def handle_exception(exc_type, exc_value, exc_traceback):
+            """Global exception handler - redirect to GUI logs"""
+            if issubclass(exc_type, KeyboardInterrupt):
+                sys.__excepthook__(exc_type, exc_value, exc_traceback)
+                return
+            
+            error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            
+            # Log to GUI if available
+            try:
+                if hasattr(app, 'log_message'):
+                    app.log_message(f"UNCAUGHT EXCEPTION:\n{error_msg}", "ERROR")
+            except:
+                pass
+        
+        import traceback
+        sys.excepthook = handle_exception
+        
         root.mainloop()
     except Exception as e:
         print(f"❌ APPLICATION ERROR: {e}")

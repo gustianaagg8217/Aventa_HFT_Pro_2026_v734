@@ -14,14 +14,43 @@ class CSVToExcelConverter:
         self.root.geometry("700x600")
         self.root.resizable(False, False)
         
+        # Apply dark theme
+        self.root.configure(bg='#1a1e3a')
+        
         # Variables
         self.csv_file_var = tk.StringVar()
         self.output_folder_var = tk.StringVar(value="Backtest")
         self.is_converting = False
         
         # Configure styles
+        self.setup_styles()
         self.setup_ui()
     
+    
+    def setup_styles(self):
+        """Setup dark theme styles to match main GUI"""
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # Dark theme colors
+        bg_color = '#1a1e3a'
+        fg_color = '#e0e0e0'
+        accent_color = '#00e676'
+        warning_color = '#ffd600'
+        error_color = '#ff1744'
+        
+        # Configure colors for ttk widgets
+        style.configure('TFrame', background=bg_color)
+        style.configure('TLabel', background=bg_color, foreground=fg_color)
+        style.configure('TLabelframe', background=bg_color, foreground=fg_color)
+        style.configure('TLabelframe.Label', background=bg_color, foreground=fg_color)
+        style.configure('TButton', background=bg_color, foreground=fg_color, borderwidth=1)
+        style.map('TButton', 
+                  background=[('active', '#2a3f5f')],
+                  foreground=[('active', accent_color)])
+        style.configure('TEntry', fieldbackground='#0f1219', foreground=fg_color, borderwidth=1)
+        style.configure('TCheckbutton', background=bg_color, foreground=fg_color)
+        
     def setup_ui(self):
         """Setup UI components"""
         # Main frame
@@ -73,7 +102,9 @@ class CSVToExcelConverter:
         log_frame = ttk.LabelFrame(main_frame, text="📝 Conversion Log", padding="5")
         log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=15, font=("Courier", 9))
+        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=15, 
+                                                  bg='#0f1219', fg='#e0e0e0', font=("Courier", 9),
+                                                  insertbackground='#00e676')
         self.log_text.pack(fill=tk.BOTH, expand=True)
         
         self.log_text.tag_config("INFO", foreground="#00e676")
