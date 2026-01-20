@@ -112,7 +112,7 @@ python Aventa_HFT_Pro_2026_v7_3_3.py
 ```
 
 ### 2. Pilih Bot dan Buka Tab "Telegram Service"
-- Select Bot: "Bagja XM Gold"
+- Select Bot: "Trading Bot Account"
 - Bot Token: (paste token dari BotFather)
 - Chat IDs: 752182014 (your chat ID)
 
@@ -125,8 +125,8 @@ python Aventa_HFT_Pro_2026_v7_3_3.py
 ### 4. Kirim Command dari Telegram
 ```
 /bots                    → See all bots and status
-/start_bot Bagja XM Gold → Start bot
-/stop_bot Bagja XM Gold  → Stop bot
+/start_bot Trading Bot Account → Start bot
+/stop_bot Trading Bot Account  → Stop bot
 ```
 
 Bot akan response dengan status/confirmation.

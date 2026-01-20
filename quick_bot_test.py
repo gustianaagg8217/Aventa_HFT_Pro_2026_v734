@@ -10,7 +10,7 @@ import asyncio
 print("TEST: Bot Creation and Runner Start\n")
 
 # 1. Load config
-config_file = "configs/Bagja_XM_Gold_config.json"
+config_file = "configs/telegram_hft_config.json"
 print(f"1. Loading config: {config_file}")
 
 with open(config_file, 'r') as f:
@@ -52,11 +52,11 @@ else:
 
 print(f"\n5. Adding bot to runner...")
 try:
-    runner.add_bot("Bagja XM Gold", bot)
+    runner.add_bot("Trading Bot Account", bot)
     time.sleep(2)
     print(f"   Bot added!")
     print(f"   Active bots: {list(runner.bots.keys())}")
-    if "Bagja XM Gold" in runner.bots:
+    if "Trading Bot Account" in runner.bots:
         print(f"   ✓ Bot is in runner!")
     else:
         print(f"   ✗ Bot NOT in runner")

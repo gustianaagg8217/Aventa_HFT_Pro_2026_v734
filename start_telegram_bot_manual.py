@@ -14,7 +14,7 @@ def main():
     print("="*70)
     
     # Load config
-    config_file = "configs/Bagja_XM_Gold_config.json"
+    config_file = "configs/telegram_hft_config.json"
     print(f"\n1. Loading config from: {config_file}")
     
     if not os.path.exists(config_file):
@@ -86,10 +86,10 @@ def main():
     # Add bot
     print(f"\n5. Adding bot to runner...")
     try:
-        runner.add_bot("Bagja XM Gold", bot)
+        runner.add_bot("Trading Bot Account", bot)
         time.sleep(2)
         
-        if "Bagja XM Gold" in runner.bots:
+        if "Trading Bot Account" in runner.bots:
             print(f"   ✓ Bot is polling Telegram updates")
         else:
             print(f"   ✗ Bot not found in runner")
@@ -105,7 +105,7 @@ def main():
     print("✓ TELEGRAM BOT IS RUNNING")
     print("="*70)
     print(f"\nBot Status:")
-    print(f"  - Bot Name: Bagja XM Gold")
+    print(f"  - Bot Name: Trading Bot Account")
     print(f"  - Event Loop: ACTIVE")
     print(f"  - Polling: ACTIVE")
     print(f"  - Chat ID: {chat_ids[0]}")
@@ -113,8 +113,8 @@ def main():
     print(f"  1. Open GUI Launcher: python Aventa_HFT_Pro_2026_v7_3_3.py")
     print(f"  2. Send Telegram commands:")
     print(f"     /bots                    - List all bots")
-    print(f"     /start_bot Bagja XM Gold - Start bot")
-    print(f"     /stop_bot Bagja XM Gold  - Stop bot")
+    print(f"     /start_bot Trading Bot Account - Start bot")
+    print(f"     /stop_bot Trading Bot Account  - Stop bot")
     print(f"\nBot will respond to your commands!")
     print(f"\nPress Ctrl+C to stop the bot")
     print("="*70 + "\n")

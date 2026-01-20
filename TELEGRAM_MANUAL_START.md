@@ -20,7 +20,7 @@ Script ini akan:
 
 Hasilnya:
 ```
-Starting Telegram Bot: Bagja XM Gold
+Starting Telegram Bot: Trading Bot Account
 Token: 8531073542:AAENQ-...
 Chat ID: 752182014
 Event loop started ✓
@@ -35,8 +35,8 @@ python Aventa_HFT_Pro_2026_v7_3_3.py
 ### 4. Kirim Telegram Command
 ```
 /bots
-/start_bot Bagja XM Gold
-/stop_bot Bagja XM Gold
+/start_bot Trading Bot Account
+/stop_bot Trading Bot Account
 ```
 
 Bot akan respons! ✅

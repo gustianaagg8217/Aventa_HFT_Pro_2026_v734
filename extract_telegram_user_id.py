@@ -22,7 +22,7 @@ def extract_user_id():
     print("\n" + "="*70)
     
     # Load config
-    config_file = "configs/Bagja_XM_Gold_config.json"
+    config_file = "configs/telegram_hft_config.json"
     with open(config_file, 'r') as f:
         config = json.load(f)
     

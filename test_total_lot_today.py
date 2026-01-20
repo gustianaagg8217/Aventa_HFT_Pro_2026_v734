@@ -75,7 +75,7 @@ try:
     signal_template = """
 🔵 OPEN POSITION SIGNAL
 
-🤖 Bot: Bagja XM Gold
+🤖 Bot: Trading Bot Account
 📊 Symbol: GOLD
 📈 Order Type: BUY
 📦 Volume: 0.01

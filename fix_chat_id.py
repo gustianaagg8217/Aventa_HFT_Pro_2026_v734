@@ -5,7 +5,7 @@ Fix Chat ID in config file
 import json
 import os
 
-config_file = "configs/Bagja_XM_Gold_config.json"
+config_file = "configs/telegram_hft_config.json"
 
 print(f"Reading: {config_file}")
 with open(config_file, 'r') as f:

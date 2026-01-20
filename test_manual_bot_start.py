@@ -15,7 +15,7 @@ def test_manual_start():
     print("=" * 60)
     
     # 1. Load config
-    config_file = "configs/Bagja_XM_Gold_config.json"
+    config_file = "configs/telegram_hft_config.json"
     print(f"\n1. Loading config from: {config_file}")
     
     if not os.path.exists(config_file):
@@ -64,7 +64,7 @@ def test_manual_start():
     # 5. Add bot to runner
     print("\n5. Adding bot to runner...")
     try:
-        result = runner.add_bot("Bagja XM Gold", bot)
+        result = runner.add_bot("Trading Bot Account", bot)
         print(f"   Bot added: {result}")
     except Exception as e:
         print(f"   ERROR adding bot: {e}")
@@ -75,7 +75,7 @@ def test_manual_start():
     # 6. Check status
     print("\n6. Checking status...")
     print(f"   Active bots in runner: {list(runner.bots.keys())}")
-    print(f"   Bot status: {runner.bots.get('Bagja XM Gold', 'NOT FOUND')}")
+    print(f"   Bot status: {runner.bots.get('Trading Bot Account', 'NOT FOUND')}")
     
     print("\n" + "=" * 60)
     print("TEST COMPLETE - Bot should be polling now")
