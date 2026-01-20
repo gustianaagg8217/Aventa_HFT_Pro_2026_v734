@@ -1242,12 +1242,17 @@ class UltraLowLatencyEngine:
 
             current_positions = self.get_current_positions_count()
 
+            # ✅ FIX: Get current account balance for proper drawdown calculation
+            account_info = mt5.account_info()
+            account_balance = account_info.balance if account_info else 0.0
+
             allowed, reason = True, ""
             if self.risk_manager:
                 allowed, reason = self.risk_manager.validate_trade(
                     trade_type=signal.signal_type,
                     volume=signal.volume,
-                    current_positions=current_positions
+                    current_positions=current_positions,
+                    account_balance=account_balance
                 )
 
             if not allowed:

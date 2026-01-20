@@ -91,16 +91,22 @@ class RiskManager:
         self.db = TradeDatabase(db_path)
         self.bot_id = config.get('_bot_id', 'default_bot')
     
-    def reset_daily_stats(self):
+    def reset_daily_stats(self, current_account_balance: float = 0.0):
         """Reset daily statistics"""
         today = datetime.now().date()
         if today > self.last_reset_date:
-            logger.info(f"Resetting daily stats.Yesterday PnL: {self.daily_pnl:.2f}")
+            logger.info(f"Resetting daily stats. Yesterday PnL: {self.daily_pnl:.2f}")
             
             self.daily_pnl = 0.0
             self.daily_trades = 0
             self.daily_volume = 0.0
-            self.peak_balance = 0.0  # Will be set to current account balance
+            # ✅ FIX: Set peak_balance to current account balance (not 0.0)
+            # This ensures drawdown calculation is based on today's starting balance
+            if current_account_balance > 0:
+                self.peak_balance = current_account_balance
+                logger.info(f"✓ Daily peak balance reset to current: ${self.peak_balance:.2f}")
+            else:
+                self.peak_balance = 0.0
             self.current_drawdown = 0.0  # Reset current drawdown
             self.last_reset_date = today
             
@@ -110,12 +116,13 @@ class RiskManager:
                 self.circuit_breaker_triggered = False
                 self.trading_enabled = True
     
-    def check_risk_limits(self) -> Tuple[bool, str]:
+    def check_risk_limits(self, account_balance: float = 0.0) -> Tuple[bool, str]:
         """
         Check if trading is allowed based on risk limits
         Returns: (allowed, reason)
         """
-        self.reset_daily_stats()
+        # ✅ FIX: Pass account_balance to reset_daily_stats
+        self.reset_daily_stats(account_balance)
         
         # Check circuit breaker
         if self.circuit_breaker_triggered:
@@ -214,13 +221,15 @@ class RiskManager:
     def validate_trade(self, 
                       trade_type: str,
                       volume: float,
-                      current_positions: int) -> Tuple[bool, str]:
+                      current_positions: int,
+                      account_balance: float = 0.0) -> Tuple[bool, str]:
         """
         Validate if trade should be executed
         Returns: (allowed, reason)
         """
+        # ✅ FIX: Pass account_balance for drawdown reset
         # Check risk limits
-        allowed, reason = self.check_risk_limits()
+        allowed, reason = self.check_risk_limits(account_balance)
         if not allowed:
             return False, reason
         
