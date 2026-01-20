@@ -157,12 +157,30 @@ class UltraLowLatencyEngine:
         # ========================================
         # STEP 10: Performance tracking
         # ========================================
-        # Use cached account info to avoid repeated MT5 calls
-        account_snapshot = self.account_cache.get_info()
-        initial_equity = account_snapshot.equity if account_snapshot else 10000.0
+        # ✅ FIX: Get ACTUAL current equity, not hardcoded 10000
+        account_info = mt5.account_info()
+        if account_info:
+            initial_equity = account_info.equity
+        else:
+            # Fallback: try account_cache
+            account_snapshot = self.account_cache.get_info()
+            initial_equity = account_snapshot.equity if account_snapshot else 0.0
+        
+        # Ensure we have a valid starting equity
+        if initial_equity <= 0:
+            logger.warning("⚠️ Cannot determine initial equity, using config value")
+            initial_equity = config.get('initial_balance', 10000.0)
         
         self.peak_equity = initial_equity
+        logger.info(f"✓ Initial peak_equity set to ACTUAL current: ${self.peak_equity:.2f}")
         self.signals_generated = 0
+        
+        # ✅ FIX: Also initialize risk_manager.peak_balance with current balance
+        if self.risk_manager:
+            account_info = mt5.account_info()
+            if account_info:
+                self.risk_manager.peak_balance = account_info.balance
+                logger.info(f"✓ Risk Manager peak_balance initialized to: ${self.risk_manager.peak_balance:.2f}")
         
         # Daily reset tracking
         self.last_reset_date = datetime.now().date()
@@ -311,6 +329,13 @@ class UltraLowLatencyEngine:
             if current_equity > 0:
                 self.peak_equity = current_equity
                 logger.info(f"✓ Daily peak equity reset to current: ${self.peak_equity:.2f}")
+                
+                # ✅ FIX: Also reset risk_manager's peak_balance with current account balance
+                if self.risk_manager:
+                    account_info = mt5.account_info()
+                    if account_info:
+                        self.risk_manager.reset_daily_stats(account_info.balance)
+                        logger.info(f"✓ Risk Manager peak_balance reset to: ${account_info.balance:.2f}")
             else:
                 # Fallback to initial balance if can't get current equity
                 self.peak_equity = self.bot_initial_balance
