@@ -2710,10 +2710,7 @@ class HFTProGUI:
                         command=self.export_backtest_results, width=18).pack(side=tk.LEFT, padx=5)
                 
                 ttk.Button(control_row, text="📁 Export Trades CSV", 
-                        command=self.export_trades_csv, width=18).pack(side=tk.LEFT, padx=7)
-                
-                ttk.Button(control_row, text="🔄 Convert CSV2Excel", 
-                        command=self.launch_csv_converter, width=18).pack(side=tk.LEFT, padx=7)
+                        command=self.export_trades_csv, width=18).pack(side=tk.LEFT, padx=11)
 
                 # Progress Bar
                 progress_frame = ttk.Frame(config_frame)
@@ -3122,7 +3119,7 @@ class HFTProGUI:
                 import subprocess
                 import os
                 
-                converter_path = os.path.join(os.path.dirname(__file__), "csv_to_excel_converter_gui.exe")
+                converter_path = os.path.join(os.path.dirname(__file__), "csv_to_excel_converter_gui.py")
                 
                 if not os.path.exists(converter_path):
                     messagebox.showerror("Error", f"Converter not found: {converter_path}")
