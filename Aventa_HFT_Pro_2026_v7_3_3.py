@@ -1451,22 +1451,30 @@ class HFTProGUI:
                 
                 if enable_ml:
                     from ml_predictor import MLPredictor
-                    ml_predictor = MLPredictor(config['symbol'], config)
-                    bot['ml_predictor'] = ml_predictor
                     
-                    # Check if ML model is trained
-                    if ml_predictor.is_trained:
+                    # ✅ FIX: Check if bot already has trained ML predictor
+                    if bot.get('ml_predictor') and bot['ml_predictor'].is_trained:
+                        # Reuse existing trained predictor
+                        ml_predictor = bot['ml_predictor']
                         self.log_message(f"✅ {self.active_bot_id}: ML Predictor ENABLED & TRAINED (Ready to use)", "SUCCESS")
                     else:
-                        self.log_message(f"⚠️  {self.active_bot_id}: ML Predictor ENABLED but NOT YET TRAINED!", "WARNING")
-                        self.log_message(f"   → All trading signals will be REJECTED until you train the model!", "WARNING")
-                        self.log_message(f"   → Go to 'ML Training' tab to train the model first.", "INFO")
-                        messagebox.showwarning(
-                            "ML Model Not Trained",
-                            f"ML Prediction is ENABLED for {self.active_bot_id}, but the model is not trained yet.\n\n"
-                            f"⚠️  WARNING: All trading signals will be REJECTED until the model is trained!\n\n"
-                            f"Please go to the 'ML Training' tab and train the model first."
-                        )
+                        # Create new predictor (will not have trained models unless loaded)
+                        ml_predictor = MLPredictor(config['symbol'], config)
+                        bot['ml_predictor'] = ml_predictor
+                        
+                        # Check if ML model is trained
+                        if ml_predictor.is_trained:
+                            self.log_message(f"✅ {self.active_bot_id}: ML Predictor ENABLED & TRAINED (Ready to use)", "SUCCESS")
+                        else:
+                            self.log_message(f"⚠️  {self.active_bot_id}: ML Predictor ENABLED but NOT YET TRAINED!", "WARNING")
+                            self.log_message(f"   → All trading signals will be REJECTED until you train the model!", "WARNING")
+                            self.log_message(f"   → Go to 'ML Training' tab to train the model first.", "INFO")
+                            messagebox.showwarning(
+                                "ML Model Not Trained",
+                                f"ML Prediction is ENABLED for {self.active_bot_id}, but the model is not trained yet.\n\n"
+                                f"⚠️  WARNING: All trading signals will be REJECTED until the model is trained!\n\n"
+                                f"Please go to the 'ML Training' tab and train the model first."
+                            )
                 else:
                     self.log_message(f"{self.active_bot_id}: ML Prediction DISABLED (Technical signals only)", "INFO")
                 
