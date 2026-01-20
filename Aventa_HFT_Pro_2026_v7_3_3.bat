@@ -61,20 +61,32 @@ if %errorlevel% neq 0 (
 )
 
 REM ============================================================
-REM 6. JALANKAN PROGRAM UTAMA
+REM 6. CEK FILE PROGRAM
 REM ============================================================
 if not exist "Aventa_HFT_Pro_2026_v7_3_3.py" (
-    echo [ERROR] File utama tidak ditemukan
+    echo [ERROR] Aventa_HFT_Pro_2026_v7_3_3.py tidak ditemukan
     pause
     exit /b 1
 )
 
+if not exist "start_telegram_bot_manual.py" (
+    echo [ERROR] start_telegram_bot_manual.py tidak ditemukan
+    pause
+    exit /b 1
+)
+
+REM ============================================================
+REM 7. JALANKAN PROGRAM (PARALEL)
+REM ============================================================
 echo.
-echo [INFO] Menjalankan Aventa HFT Pro 2026...
-echo ============================================================
-python Aventa_HFT_Pro_2026_v7_3_3.py
+echo [INFO] Menjalankan AVENTA HFT PRO 2026...
+start "AVENTA_HFT" cmd /k python Aventa_HFT_Pro_2026_v7_3_3.py
+
+echo [INFO] Menjalankan TELEGRAM BOT...
+start "TELEGRAM_BOT" cmd /k python start_telegram_bot_manual.py
 
 echo.
 echo ============================================================
-echo [INFO] Launcher selesai
+echo [INFO] Semua service sudah dijalankan
+echo Jangan tutup window ini jika masih dibutuhkan
 pause
