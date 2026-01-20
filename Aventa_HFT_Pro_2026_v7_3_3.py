@@ -4738,18 +4738,27 @@ This is a test message from Aventa HFT Pro 2026"""
 
         
         def load_ml_models_folder(self):
-            """Load ML models from folder (contains 3 .pkl files)"""
+            """Load trained ML models from saved folder - hasil training sebelumnya"""
             try:
-                # Ask user to select folder
+                # ✅ FIX: Get from active bot
+                if not self.active_bot_id or self.active_bot_id not in self.bots:
+                    messagebox.showwarning("Warning", "Please select a bot first!")
+                    return
+                
+                bot = self.bots[self.active_bot_id]
+                config = bot['config']
+                symbol = config['symbol']
+                
+                # Ask user to select folder dengan saved models
                 folder_path = filedialog.askdirectory(
-                    title="Select ML Models Folder",
+                    title=f"Select Saved Models Folder for {self.active_bot_id}",
                     initialdir=os.getcwd()
                 )
                 
                 if not folder_path:
                     return
                 
-                self.log_ml_message(f"Loading models from: {folder_path}", "INFO")
+                self.log_ml_message(f"[{self.active_bot_id}] Loading models from: {folder_path}", "INFO")
                 
                 # Check if folder contains required files
                 required_files = ['direction_model.pkl', 'confidence_model.pkl', 'scaler.pkl']
@@ -4761,34 +4770,53 @@ This is a test message from Aventa HFT Pro 2026"""
                         missing_files.append(file)
                 
                 if missing_files: 
-                    error_msg = f"Missing files in folder: {', '.join(missing_files)}"
-                    self.log_ml_message(error_msg, "ERROR")
+                    error_msg = f"Missing files: {', '.join(missing_files)}"
+                    self.log_ml_message(f"[ERROR] {error_msg}", "ERROR")
                     messagebox.showerror("Error", error_msg)
                     return
                 
-                # Load models using ml_predictor
-                if not self.ml_predictor:
-                    from ml_predictor import MLPredictor
-                    config = self.get_config_from_gui()
-                    self.ml_predictor = MLPredictor(config['symbol'], config)
+                # ✅ Import ML predictor
+                from ml_predictor import MLPredictor
                 
-                # Load from folder
-                success = self.ml_predictor.load_models(folder_path)
+                self.log_ml_message(f"[{self.active_bot_id}] Initializing ML Predictor for {symbol}...", "INFO")
+                ml_predictor = MLPredictor(symbol, config)
                 
-                if success:
-                    self.log_ml_message("✓ All models loaded successfully!", "SUCCESS")
-                    self.log_ml_message(f"  - direction_model.pkl", "INFO")
-                    self.log_ml_message(f"  - confidence_model.pkl", "INFO")
-                    self.log_ml_message(f"  - scaler.pkl", "INFO")
-                    self.update_ml_status()
-                    messagebox.showinfo("Success", f"Models loaded successfully from:\n{folder_path}")
+                # ✅ Load models from folder
+                self.log_ml_message(f"[{self.active_bot_id}] Loading trained models...", "INFO")
+                success = ml_predictor.load_models(folder_path)
+                
+                if success and ml_predictor.is_trained:
+                    # ✅ Store ML predictor di bot
+                    bot['ml_predictor'] = ml_predictor
+                    
+                    self.log_ml_message(f"[SUCCESS] ✅ All models loaded successfully for {self.active_bot_id}!", "SUCCESS")
+                    self.log_ml_message(f"  Bot: {self.active_bot_id}", "INFO")
+                    self.log_ml_message(f"  Symbol: {symbol}", "INFO")
+                    self.log_ml_message(f"  Models loaded from: {folder_path}", "INFO")
+                    self.log_ml_message(f"  Model Status: READY FOR USE", "SUCCESS")
+                    self.log_ml_message(f"  ✓ direction_model.pkl", "INFO")
+                    self.log_ml_message(f"  ✓ confidence_model.pkl", "INFO")
+                    self.log_ml_message(f"  ✓ scaler.pkl", "INFO")
+                    
+                    # Update UI status
+                    self.update_ml_status_display()
+                    
+                    messagebox.showinfo("Success", 
+                        f"✅ Models loaded successfully!\n\n"
+                        f"Bot: {self.active_bot_id}\n"
+                        f"Symbol: {symbol}\n\n"
+                        f"Models siap digunakan untuk:\n"
+                        f"• Backtest dengan ML prediction\n"
+                        f"• Live trading\n"
+                        f"• Strategy validation"
+                    )
                 else:
-                    self.log_ml_message("Failed to load models", "ERROR")
-                    messagebox.showerror("Error", "Failed to load models from folder")
+                    self.log_ml_message(f"[ERROR] Failed to load models or models not ready", "ERROR")
+                    messagebox.showerror("Error", "Failed to load models or models are not valid")
                 
             except Exception as e: 
                 error_msg = f"Load models error: {str(e)}"
-                self.log_ml_message(error_msg, "ERROR")
+                self.log_ml_message(f"[ERROR] {error_msg}", "ERROR")
                 messagebox.showerror("Error", error_msg)
         
         def display_model_info(self, save_dir, accuracy, samples, bot_name=None, symbol=None):
