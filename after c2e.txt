@@ -1,0 +1,30 @@
+INSTALLATION COMPLETED SUCCESSFULLY
+
+Thank you for installing CSV to Excel Converter Pro.
+
+How to use:
+1. Run the application from Start Menu or Desktop shortcut
+2. Click "Browse" to select your CSV trading file
+3. Choose output folder (default: Backtest)
+4. Click "Convert to Excel"
+5. The Excel report will be generated automatically
+
+Output Details:
+- File format: .xlsx
+- Sheets generated:
+  * ALL_TRADES
+  * BUY_TRADES
+  * SELL_TRADES
+  * SUMMARY
+- Profit values are automatically colored:
+  Green = Profit
+  Red   = Loss
+
+Notes:
+- Make sure the CSV format matches standard trading export format
+- Initial balance is read automatically if available in the CSV header
+- All processing is done locally on your computer
+
+For best results, keep your CSV files clean and unmodified.
+
+Happy trading and safe backtesting.

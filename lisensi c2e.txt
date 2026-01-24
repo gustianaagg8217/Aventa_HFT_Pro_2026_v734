@@ -1,0 +1,28 @@
+CSV TO EXCEL CONVERTER PRO
+SOFTWARE LICENSE AGREEMENT
+
+Copyright © 2026 Agus Gustiana
+All rights reserved.
+
+This software is provided as-is without any express or implied warranty.
+In no event shall the author be held liable for any damages arising from
+the use of this software.
+
+Permission is granted to use this software for personal and commercial
+purposes, subject to the following conditions:
+
+1. You may install and use this software on multiple computers.
+2. You may not sell, sublicense, or redistribute this software as a
+   standalone product without written permission from the author.
+3. You may modify the software for personal use, but redistribution of
+   modified versions is prohibited without permission.
+4. This software processes CSV trading log data locally. No data is sent
+   to external servers.
+
+By installing and using this software, you agree to be bound by the terms
+of this license.
+
+If you do not agree with these terms, please cancel the installation.
+
+Author:
+Agus Gustiana

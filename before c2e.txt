@@ -1,0 +1,27 @@
+WELCOME TO CSV TO EXCEL CONVERTER PRO
+
+This application is designed to convert trading CSV files into
+professional Excel reports with detailed statistics.
+
+Key Features:
+- Convert CSV trading logs into Excel (.xlsx)
+- Automatic summary calculation:
+  * Total trades
+  * Win rate
+  * Profit & loss
+  * Profit factor
+- Separate sheets:
+  ALL_TRADES, BUY_TRADES, SELL_TRADES, SUMMARY
+- Colored profit and loss formatting
+- Works fully offline (no internet required)
+
+System Requirements:
+- Windows 10 or later
+- Python environment (bundled with installer if applicable)
+- No internet connection required for operation
+
+Before continuing the installation:
+- Please close other running applications
+- Make sure you have permission to install software on this computer
+
+Click Next to continue installation.
